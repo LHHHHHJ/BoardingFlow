@@ -7,6 +7,7 @@ import { readJSON, resultTable, writeArtifacts, writeJSON } from './io.js';
 import { simulate } from './simulate.js';
 import { auditPassengerDataset } from './dataset-audit.js';
 import { validateSimulationTrace } from './trace.js';
+import { runBaselineBenchmark, writeBaselineBenchmark } from './baseline-benchmark.js';
 
 const HELP = `BoardingFlow - independent SYNTHETIC boarding simulation (Node.js >=22)
 
@@ -19,12 +20,16 @@ Run from the BoardingFlow folder. No install step or external packages required.
   node src/cli.js validate-trace --input results/random/manifest.json --trace-file results/random/events-random.json
   node src/cli.js compare --input data/synthetic-flight.json --output results --trace
   node src/cli.js demo --seed 42 --output results --trace
+  node src/cli.js baselines --seeds 0,1,2,3,4,5,6,7,8,9,42 --output results/stage3
 
 generate/demo: optional --config config/example.json (partial assumption overrides).
 Stage 1 mix/group example: --config config/stage1.example.json.
 audit-dataset: reports class/mix/group sizes and allowance vs actual carry-on;
   exits 1 if the 180-passenger Stage 1 checklist is incomplete, while saving the report.
 simulate: --strategy random | zone | baggage-aware (default random).
+baselines: always random/zone/baggage-aware; synthetic Phase 1 arrival stress cases.
+  Optional --seeds comma-separated uint32s, --cases normal,all-at-gate,late-arrivals,
+  --config partial generation/simulator overrides; case arrival overrides take precedence.
 simulate/compare: reuse the complete config and passenger behavior stored in the input.
 --trace writes cell movement and row service events; --help prints this message.
 node --test runs the automated checks.
@@ -40,6 +45,7 @@ function parseArguments(argv) {
     'validate-trace': ['input', 'trace-file', 'output'],
     simulate: ['input', 'strategy', 'output', 'trace'],
     compare: ['input', 'output', 'trace'],
+    baselines: ['seeds', 'cases', 'config', 'output'],
     demo: ['seed', 'config', 'output', 'trace']
   }[command];
   if (!allowed) throw new Error(`Unknown command '${command}'; use --help`);
@@ -65,6 +71,25 @@ function parseArguments(argv) {
 async function main() {
   const { help, command, options } = parseArguments(process.argv.slice(2));
   if (help) { console.log(HELP); return; }
+  if (command === 'baselines') {
+    if (options.seeds !== undefined && !/^\d+(,\d+)*$/.test(options.seeds)) throw new Error('seeds must be comma-separated uint32 integers');
+    const benchmark = runBaselineBenchmark({
+      ...(options.seeds !== undefined ? { seeds: options.seeds.split(',').map(Number) } : {}),
+      ...(options.cases !== undefined ? { cases: options.cases.split(',') } : {}),
+      config: options.config ? await readJSON(options.config) : {}
+    });
+    const directory = resolve(options.output ?? 'results/stage3');
+    await writeBaselineBenchmark(directory, benchmark);
+    for (const summary of benchmark.report.summaries) {
+      console.log(`${summary.scenario}: mean completion seconds (sample SD)`);
+      for (const row of summary.strategies) {
+        const stat = row.metrics.totalBoardingSeconds;
+        console.log(`  ${row.strategy}: ${stat.mean.toFixed(2)} (${stat.sampleSD === null ? 'n/a' : stat.sampleSD.toFixed(2)})`);
+      }
+    }
+    console.log(`PASS: ${benchmark.report.experiments.length * 3} runs; zero constraint violations. Full metrics, variability and paired losses: ${directory}/report.md`);
+    return;
+  }
   let manifest;
   if (command === 'generate' || command === 'demo') {
     const overrides = options.config ? await readJSON(options.config) : {};

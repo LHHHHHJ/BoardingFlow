@@ -30,6 +30,20 @@ node --test
 
 See [the five-item Stage 2 audit and trace contract](docs/STAGE2_AUDIT.md). This checklist stage adds no dashboard or new boarding strategy; the earlier local Phase 2 passenger-awareness implementation is preserved outside this commit.
 
+## Stage 3 baseline strategy verification
+
+The existing random, zone and initial baggage-aware strategies now have focused ordering/constraint tests and a reproducible multi-seed comparison. Their ordering rules and the shared simulator are unchanged. The baseline remains available alongside the earlier local Phase 2 implementation.
+
+```powershell
+node --test test/stage3.test.js
+node src/cli.js baselines --seeds 0,1,2,3,4,5,6,7,8,9,42 --output results/stage3
+node --test
+```
+
+This runs 99 simulations: 11 seeds, three synthetic arrival cases, three baselines. `results/stage3/report.md` includes every run, sample variability and paired losses; JSON/CSV and each case's manifest/passenger timings permit inspection. Optional `--cases normal,all-at-gate,late-arrivals` and `--config config/example.json` select cases and assumptions; the case's arrival settings take precedence over custom arrival settings. Output datasets remain Git-ignored.
+
+Baggage-aware wins completion against random in 9 of 11 seeds per case, but loses in seeds 1 and 9 and slightly increases average gate waiting. See [the six-item Stage 3 audit](docs/STAGE3_AUDIT.md) and [measured comparison/test results](docs/STAGE3_RESULTS.md). This stage adds no adaptive features, dashboard or ML.
+
 ## Run everything
 
 From the parent workspace in PowerShell:

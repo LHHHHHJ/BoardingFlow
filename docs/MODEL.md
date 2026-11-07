@@ -56,7 +56,11 @@ All strategies preserve the same preboard/priority ordering and policies above. 
 - **Zone:** common lottery within each general zone; protected stages remain unchanged. For 30 rows, zone 1 is rows 21–30, zone 2 rows 11–20 and zone 3 rows 1–10.
 - **Baggage-aware:** in general boarding, sort by average seat depth (window 0, middle 1, aisle 2), then descending expected stow work (mean overhead-piece count × sampled stow duration across members), then even rows before odd rows, rear before front, then lottery rank. Row order only breaks ties in the preceding scores. Parties remain intact, so mixed window/aisle parties constrain seat ordering.
 
-The baggage-aware strategy is a deterministic rule using known synthetic baggage/service inputs. It does not train a model or claim an optimal boarding sequence.
+The baggage-aware strategy is a deterministic rule using known synthetic baggage/service inputs. It does not train a model or claim an optimal boarding sequence. Its Phase 1 score treats the sampled per-passenger stow duration as known; this is an idealized information assumption, not a measured prediction.
+
+Random is a uniform seeded shuffle of boarding units before readiness filtering, rather than a uniform permutation of individual passengers: intact parties, window-to-aisle party order and protected stages constrain the sample space. The baggage row rule places even rows before odd rows, rear to front within each parity, only after equal depth and equal baggage scores. It does not guarantee an alternating or evenly spaced actual admission sequence.
+
+`compareBaselines(manifest)` explicitly retains random/zone/baggage-aware. Existing `compareStrategies(manifest)` continues to select those three baselines in this committed Stage 3 implementation. The separately held local Phase 2 selection remains outside this commit. Both paths use the same aircraft engine and full-manifest fingerprint checks. The Stage 3 `baselines` CLI tests reproducible Phase 1 arrival cases without running or extending adaptive optimization. See [the Stage 3 audit](STAGE3_AUDIT.md) for the documented Stage 6 handoff and [multi-seed measurements](STAGE3_RESULTS.md).
 
 ## Spatial simulation
 
