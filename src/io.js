@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { STRATEGIES } from './strategies.js';
+import { createTraceEnvelope } from './trace.js';
 
 export async function readJSON(path) {
   try {
@@ -65,13 +66,14 @@ export const duration = seconds => {
 };
 
 export function resultTable(results) {
-  const columns = ['Strategy', 'Boarding m:ss', 'Mean gate wait min', 'Aisle block person-min', 'Seat interference s'];
+  const columns = ['Strategy', 'Boarding m:ss', 'Mean gate wait min', 'Aisle block person-min', 'Seat interference s', 'Violations'];
   const rows = results.map(result => [
     result.strategy,
     duration(result.metrics.totalBoardingSeconds),
     (result.metrics.meanGateWaitSeconds / 60).toFixed(2),
     (result.metrics.aisleBlockingPersonSeconds / 60).toFixed(2),
-    result.metrics.seatInterferencePersonSeconds.toFixed(1)
+    result.metrics.seatInterferencePersonSeconds.toFixed(1),
+    String(result.metrics.constraintViolationCount)
   ]);
   const widths = columns.map((column, index) => Math.max(column.length, ...rows.map(row => row[index].length)));
   const format = row => row.map((value, index) => value.padEnd(widths[index])).join('  ');
@@ -99,21 +101,20 @@ export async function writeArtifacts(directory, manifest, results) {
     inputHash: results[0]?.inputHash,
     metricNotes: {
       totalBoardingSeconds: 'Elapsed from boarding opening (t=0) until last seating; includes idle periods.',
-      meanGateWaitSeconds: 'Mean entry time minus estimated gate arrival, including time before boarding opens.',
+      meanGateWaitSeconds: 'Mean entry time minus ACTUAL simulated gate arrival, including time before boarding opens.',
       aisleBlockingPersonSeconds: 'Sum of time ready-to-walk passengers wait for an occupied next cell; excludes their own row service.',
+      aisleBlockingPersonMinutes: 'The same passenger-time aggregate in minutes (aisleBlockingPersonSeconds / 60).',
       gateEntranceBlockedSeconds: 'Elapsed time a ready gate admission waits because entrance cell 0 is occupied.'
     },
-    results: results.map(({ strategy, inputHash, metrics, validation }) => ({ strategy, inputHash, metrics, validation }))
+    results: results.map(({ strategy, inputHash, metrics, validation, constraintViolations }) => ({ strategy, inputHash, metrics, validation, constraintViolations }))
   };
   await writeJSON(join(directory, 'comparison.json'), comparison);
   await writeFile(join(directory, 'comparison.csv'), csv(results.map(result => ({ strategy: result.strategy, inputHash: result.inputHash, ...result.metrics }))), 'utf8');
   for (const result of results) {
-    const { events, ...timingResult } = result;
+    const { events, traceMetadata, traceValidation, ...timingResult } = result;
     await writeJSON(join(directory, `timings-${result.strategy}.json`), timingResult);
     await writeFile(join(directory, `timings-${result.strategy}.csv`), csv(result.passengerTimings), 'utf8');
-    if (events) await writeJSON(join(directory, `events-${result.strategy}.json`), {
-      dataKind: 'SYNTHETIC', strategy: result.strategy, inputHash: result.inputHash, events
-    });
+    if (events) await writeJSON(join(directory, `events-${result.strategy}.json`), createTraceEnvelope(manifest, result));
   }
   await writeFile(join(directory, 'report.txt'), [
     `BoardingFlow | SYNTHETIC | seed ${manifest.seed} | ${manifest.passengers.length} passengers`,

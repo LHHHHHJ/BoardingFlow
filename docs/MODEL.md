@@ -90,6 +90,7 @@ Stowing at different rows overlaps. A passenger stowing at an earlier row can bl
 | `meanGateWaitSeconds` | Total gate wait divided by passenger count; includes waiting before opening |
 | `maxGateWaitSeconds` | Largest individual gate wait |
 | `aisleBlockingPersonSeconds` | Sum of ready-to-walk time lost to an occupied next cell; excludes own row service |
+| `aisleBlockingPersonMinutes` | The same aggregate divided by 60, explicitly exported in JSON/CSV |
 | `meanAisleBlockingSeconds` | Above sum divided by passenger count |
 | `gateEntranceBlockedSeconds` | Elapsed ticks when a ready admission with satisfied headway waits for occupied cell 0 |
 | `rowServicePersonSeconds` | Sum of all row-service durations; services at different rows may overlap |
@@ -107,3 +108,9 @@ Passenger generation and boarding lotteries use separate deterministic random st
 Every simulation audits unique seating, arrival restrictions, stage order, preboarding completion, party adjacency, escort exclusivity, completion time and per-passenger aisle-time reconciliation. Tests cover duplicates, uncleared status, late passengers/priority/companions, empty and single-passenger cases, all/no baggage, all priority, all assisted, seat interference, fractional ticks, slow walking, collision-free traces, invalid configuration, timeout and the full CLI workflow.
 
 This version has no bin-capacity/search model, gate-check process, jetbridge, second door, passing, cabin crew congestion, live data, departure cutoff, no-shows or abandonment. Seat interference is a time penalty rather than a full standing-passenger geometry model. All passengers eventually arrive or the run times out. Parameters have not been calibrated against real boarding observations. Broader claims would need multiple scenarios, sensitivity analysis and operational validation.
+
+## Stage 2 verification and trace contract
+
+Traced runs now include aircraft/passenger replay metadata, chronological `eventIndex` values, assistance/interference completion events and explicit aisle/entrance blocking intervals. Every traced run independently replays each simulation tick, checking sampled walking speeds, occupied cells, row service phases, protected boarding arrangements and recomputed metrics. A ready walker may wait only for an occupied next cell; this does not prohibit valid gate waits for arrivals, protected stages, escorts or existing policy decisions.
+
+`validate-trace` can repeat this audit on an exported trace and its matching manifest. Passenger-timing artifacts stay identical between traced and untraced runs. Full traces are post-run evaluation/viewer data and are not provided to adaptive decisions. See [STAGE2_AUDIT.md](STAGE2_AUDIT.md) for the schema, compatibility notes, assumptions and measured results.

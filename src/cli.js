@@ -6,6 +6,7 @@ import { deepFreeze, validateManifest } from './model.js';
 import { readJSON, resultTable, writeArtifacts, writeJSON } from './io.js';
 import { simulate } from './simulate.js';
 import { auditPassengerDataset } from './dataset-audit.js';
+import { validateSimulationTrace } from './trace.js';
 
 const HELP = `BoardingFlow - independent SYNTHETIC boarding simulation (Node.js >=22)
 
@@ -15,6 +16,7 @@ Run from the BoardingFlow folder. No install step or external packages required.
   node src/cli.js validate --input data/synthetic-flight.json
   node src/cli.js audit-dataset --input data/synthetic-flight.json --output results/stage1/dataset-audit.json
   node src/cli.js simulate --input data/synthetic-flight.json --strategy random --output results/random --trace
+  node src/cli.js validate-trace --input results/random/manifest.json --trace-file results/random/events-random.json
   node src/cli.js compare --input data/synthetic-flight.json --output results --trace
   node src/cli.js demo --seed 42 --output results --trace
 
@@ -35,6 +37,7 @@ function parseArguments(argv) {
     generate: ['seed', 'config', 'output'],
     validate: ['input'],
     'audit-dataset': ['input', 'output'],
+    'validate-trace': ['input', 'trace-file', 'output'],
     simulate: ['input', 'strategy', 'output', 'trace'],
     compare: ['input', 'output', 'trace'],
     demo: ['seed', 'config', 'output', 'trace']
@@ -53,7 +56,8 @@ function parseArguments(argv) {
       options[key] = value;
     }
   }
-  if (['validate', 'simulate', 'compare', 'audit-dataset'].includes(command) && !options.input) throw new Error(`${command} requires --input`);
+  if (['validate', 'simulate', 'compare', 'audit-dataset', 'validate-trace'].includes(command) && !options.input) throw new Error(`${command} requires --input`);
+  if (command === 'validate-trace' && !options['trace-file']) throw new Error('validate-trace requires --trace-file');
   if (options.seed !== undefined && !/^\d+$/.test(options.seed)) throw new Error('seed must be uint32');
   return { command, options };
 }
@@ -85,6 +89,12 @@ async function main() {
   const validation = validateManifest(manifest);
   console.log(`BoardingFlow | SYNTHETIC | seed=${manifest.seed} | passengers=${validation.passengerCount}/${validation.capacity}`);
   console.log(`Input SHA-256: ${validation.inputHash}`);
+  if (command === 'validate-trace') {
+    const report = validateSimulationTrace(manifest, await readJSON(options['trace-file']));
+    if (options.output) await writeJSON(resolve(options.output), report);
+    console.log(`VALID TRACE: ${report.eventCount} events; ${report.seatedExactlyOnce} seated exactly once; movement, queues, service phases and metrics verified.`);
+    return;
+  }
   if (command === 'validate') {
     console.log(`VALID: ${validation.passengerCount} unique IDs, ${validation.uniqueSeats} unique seats; clearance, timestamps, baggage and companions checked.`);
     return;

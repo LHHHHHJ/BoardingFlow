@@ -18,6 +18,18 @@ node --test
 
 Use `--config config/stage1.example.json` with `generate` to change class/priority/assistance mix, carry-on rates and party-size bounds. New datasets use schema 2. Saved schema 1 inputs still work; their missing class labels are reported as unknown by the new audit. New metadata changes generated input fingerprints while default physical passenger draws and simulation completion times remain unchanged.
 
+## Stage 2 core simulator verification
+
+The existing shared aircraft engine now exports a versioned trace with geometry, service phases and blocking intervals. Independent replay checks movement speed, collisions, unexplained aisle queues, timing and metrics. Passenger-minutes are explicit in JSON/CSV as `aisleBlockingPersonMinutes`.
+
+```powershell
+node src/cli.js demo --seed 42 --output results/stage2 --trace
+node src/cli.js validate-trace --input results/stage2/manifest.json --trace-file results/stage2/events-random.json --output results/stage2/validation-random.json
+node --test
+```
+
+See [the five-item Stage 2 audit and trace contract](docs/STAGE2_AUDIT.md). This checklist stage adds no dashboard or new boarding strategy; the earlier local Phase 2 passenger-awareness implementation is preserved outside this commit.
+
 ## Run everything
 
 From the parent workspace in PowerShell:
@@ -82,6 +94,8 @@ BoardingFlow/
     dataset-audit.js         Stage 1 dataset summary and baggage evidence
     strategies.js            Shared party/stage rules and strategy ordering
     simulate.js              Spatial simulation and result invariant audit
+    trace.js                 Versioned trace contract and independent replay validator
+    constraints.js           Shared post-run core boarding constraint checks
     compare.js               Immutable shared-input comparison
     io.js                    JSON/CSV exports and CLI result formatting
     cli.js                   generate, validate, simulate, compare, demo
@@ -93,6 +107,7 @@ BoardingFlow/
     MODEL.md                 Assumptions, algorithm and metric definitions
     RESULTS.md               Measured default seed-42 results
     STAGE1_AUDIT.md           Passenger dataset requirement audit and verification
+    STAGE2_AUDIT.md           Core simulator checklist, trace schema and verification
   data/                      Created by the generate command
   results/                   Created by demo/compare; generated files are gitignored
 ```

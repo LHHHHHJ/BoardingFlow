@@ -1,5 +1,7 @@
 import { blockingSeats, manifestHash, parseSeat, STAGE_NAMES, validateManifest } from './model.js';
 import { boardingUnits, orderUnits, readyUnit } from './strategies.js';
+import { constraintReport } from './constraints.js';
+import { createTraceMetadata, validateSimulationTrace } from './trace.js';
 
 const clean = value => Math.round(value * 1_000_000) / 1_000_000;
 const sum = (items, key) => clean(items.reduce((total, item) => total + item[key], 0));
@@ -25,6 +27,7 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
   let escortUnit = null;
   let nextAdmissionTick = 0;
   let gateEntranceBlockedTicks = 0;
+  let gateBlockedSinceTick = null;
   let maxConcurrentInAisle = 0;
   let completionTick = 0;
   const occupied = () => aisle.some(Boolean);
@@ -50,15 +53,20 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
       rowServiceSeconds: seconds(assistanceTicks + stowTicks + interferenceTicks + seatTicks)
     });
     state.serviceEndTick = tick + assistanceTicks + stowTicks + interferenceTicks + seatTicks;
-    emit(tick, 'row_service_started', { passengerId: passenger.id, cell: state.cell, blockingSeats: blockers });
+    emit(tick, 'row_service_started', { passengerId: passenger.id, cell: state.cell, blockingSeats: blockers,
+      assistanceSeconds: record.assistanceSeconds, stowSeconds: record.stowSeconds,
+      seatInterferenceSeconds: record.seatInterferenceSeconds, seatingSeconds: record.seatingSeconds,
+      serviceEndSeconds: seconds(state.serviceEndTick) });
     if (assistanceTicks) emit(tick, 'assistance_started', { passengerId: passenger.id, durationSeconds: seconds(assistanceTicks) });
     const stowStart = tick + assistanceTicks;
+    if (assistanceTicks) emit(stowStart, 'assistance_completed', { passengerId: passenger.id });
     if (stowTicks) {
       emit(stowStart, 'stow_started', { passengerId: passenger.id, pieces: passenger.actualBaggage.overheadPieces });
       emit(stowStart + stowTicks, 'stow_completed', { passengerId: passenger.id });
     }
     const interferenceStart = stowStart + stowTicks;
     if (interferenceTicks) emit(interferenceStart, 'seat_interference_started', { passengerId: passenger.id, blockingSeats: blockers });
+    if (interferenceTicks) emit(interferenceStart + interferenceTicks, 'seat_interference_completed', { passengerId: passenger.id });
     emit(interferenceStart + interferenceTicks, 'seating_started', { passengerId: passenger.id });
   }
 
@@ -93,8 +101,18 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
       const state = aisle[cell];
       if (!state || state.serviceEndTick !== null || state.nextMoveTick > tick) continue;
       if (aisle[cell + 1]) {
+        if (state.blockedSinceTick === null) {
+          state.blockedSinceTick = tick;
+          emit(tick, 'aisle_block_started', { passengerId: state.passenger.id, cell,
+            blockedCell: cell + 1, blockedByPassengerId: aisle[cell + 1].passenger.id });
+        }
         records.get(state.passenger.id).aisleBlockingSeconds += dt;
       } else {
+        if (state.blockedSinceTick !== null) {
+          emit(tick, 'aisle_block_ended', { passengerId: state.passenger.id, cell,
+            durationSeconds: seconds(tick - state.blockedSinceTick) });
+          state.blockedSinceTick = null;
+        }
         aisle[cell] = null;
         aisle[cell + 1] = state;
         state.cell = cell + 1;
@@ -120,17 +138,31 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
           activeUnit = candidate;
           pending.splice(pending.indexOf(candidate), 1);
           memberIndex = 0;
-          emit(tick, 'unit_called', { unitId: candidate.id, stage: STAGE_NAMES[stage], assisted: candidate.assisted });
+          emit(tick, 'unit_called', { unitId: candidate.id, stage: STAGE_NAMES[stage], assisted: candidate.assisted,
+            memberIds: candidate.members.map(passenger => passenger.id) });
         }
       }
       if (activeUnit) {
         if (aisle[0]) {
+          if (gateBlockedSinceTick === null) {
+            gateBlockedSinceTick = tick;
+            emit(tick, 'gate_entry_block_started', { passengerId: activeUnit.members[memberIndex].id,
+              blockedByPassengerId: aisle[0].passenger.id });
+          }
           gateEntranceBlockedTicks++;
         } else {
+          if (gateBlockedSinceTick !== null) {
+            emit(tick, 'gate_entry_block_ended', { passengerId: activeUnit.members[memberIndex].id,
+              durationSeconds: seconds(tick - gateBlockedSinceTick) });
+            gateBlockedSinceTick = null;
+          }
           const passenger = activeUnit.members[memberIndex++];
+          if (seconds(tick) < passenger.gateArrivalSeconds) {
+            throw new Error('Execution guard: passenger is not actually cleared and present at gate');
+          }
           const { row } = parseSeat(passenger.seatNumber);
           const walkTicks = ticks(passenger.behavior.walkSecondsPerRow);
-          aisle[0] = { passenger, row, cell: 0, walkTicks, nextMoveTick: tick + walkTicks, serviceEndTick: null };
+          aisle[0] = { passenger, row, cell: 0, walkTicks, nextMoveTick: tick + walkTicks, serviceEndTick: null, blockedSinceTick: null };
           records.set(passenger.id, {
             passengerId: passenger.id,
             seatNumber: passenger.seatNumber,
@@ -142,7 +174,8 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
             freeWalkingSeconds: seconds(row * walkTicks),
             aisleBlockingSeconds: 0
           });
-          emit(tick, 'boarded', { passengerId: passenger.id, cell: 0, stage: STAGE_NAMES[stage], unitId: activeUnit.id });
+          emit(tick, 'boarded', { passengerId: passenger.id, cell: 0, seatNumber: passenger.seatNumber,
+            stage: STAGE_NAMES[stage], unitId: activeUnit.id });
           nextAdmissionTick = tick + ticks(config.gateHeadwaySeconds);
           if (memberIndex === activeUnit.members.length) {
             if (activeUnit.assisted) escortUnit = activeUnit;
@@ -173,6 +206,7 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
       meanGateWaitSeconds: mean('gateWaitSeconds'),
       maxGateWaitSeconds: count ? Math.max(...timings.map(r => r.gateWaitSeconds)) : 0,
       aisleBlockingPersonSeconds: sum(timings, 'aisleBlockingSeconds'),
+      aisleBlockingPersonMinutes: clean(sum(timings, 'aisleBlockingSeconds') / 60),
       meanAisleBlockingSeconds: mean('aisleBlockingSeconds'),
       gateEntranceBlockedSeconds: seconds(gateEntranceBlockedTicks),
       rowServicePersonSeconds: sum(timings, 'rowServiceSeconds'),
@@ -183,8 +217,16 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
     },
     passengerTimings: timings
   };
-  if (trace) result.events = events.sort((a, b) => a.timeSeconds - b.timeSeconds || a.sequence - b.sequence);
+  if (trace) {
+    result.traceMetadata = createTraceMetadata(manifest);
+    result.events = events.sort((a, b) => a.timeSeconds - b.timeSeconds || a.sequence - b.sequence)
+      .map((event, eventIndex) => ({ ...event, eventIndex }));
+  }
+  result.constraintViolations = constraintReport(manifest, result);
+  result.metrics.constraintViolationCount = result.constraintViolations.total;
+  if (result.constraintViolations.total) throw new Error('Boarding constraint violations detected');
   result.validation = auditResult(manifest, result, { requireFullFlight });
+  if (trace) result.traceValidation = validateSimulationTrace(manifest, result, { requireFullFlight });
   return result;
 }
 
@@ -192,6 +234,7 @@ export function auditResult(manifest, result, { requireFullFlight = true } = {})
   validateManifest(manifest, { requireFullFlight });
   const fail = message => { throw new Error(`Simulation invariant failed: ${message}`); };
   const timings = result.passengerTimings;
+  if (!Array.isArray(timings) || !result.metrics) fail('timings and metrics are required');
   if (result.inputHash !== manifestHash(manifest)) fail('input fingerprint changed');
   if (timings.length !== manifest.passengers.length) fail('not all passengers seated');
   const byId = new Map(manifest.passengers.map(p => [p.id, p]));
@@ -200,6 +243,11 @@ export function auditResult(manifest, result, { requireFullFlight = true } = {})
   const seats = new Set();
   let previousStage = -1;
   let previousBoardedAt = -Infinity;
+  const dt = manifest.config.simulation.tickSeconds;
+  const quantize = value => clean(Math.ceil(value / dt - 1e-10) * dt);
+  const close = (actual, expected, label) => {
+    if (!Number.isFinite(actual) || Math.abs(actual - expected) > 1e-5) fail(`${label} inconsistent`);
+  };
   for (const record of timings) {
     const passenger = byId.get(record.passengerId);
     if (!passenger || ids.has(record.passengerId) || seats.has(record.seatNumber)) fail('unknown or duplicate seating');
@@ -209,13 +257,36 @@ export function auditResult(manifest, result, { requireFullFlight = true } = {})
     const unit = unitByPassenger.get(passenger.id);
     if (record.stage !== STAGE_NAMES[unit.stage] || unit.stage < previousStage) fail('priority stages violated');
     previousStage = unit.stage;
+    for (const key of ['boardedAtSeconds', 'rowArrivalSeconds', 'seatedAtSeconds', 'gateWaitSeconds', 'freeWalkingSeconds',
+      'aisleBlockingSeconds', 'rowServiceSeconds', 'assistanceSeconds', 'stowSeconds', 'seatInterferenceSeconds',
+      'seatInterferenceCount', 'seatingSeconds', 'inAisleSeconds']) {
+      if (!Number.isFinite(record[key]) || record[key] < 0) fail(`invalid ${key}`);
+    }
     if (!Number.isFinite(record.boardedAtSeconds) || !Number.isFinite(record.seatedAtSeconds)
         || record.boardedAtSeconds < Math.max(0, passenger.gateArrivalSeconds)
         || record.seatedAtSeconds <= record.boardedAtSeconds) fail('invalid boarding/seating time');
-    if (record.boardedAtSeconds < previousBoardedAt) fail('admission order inconsistent');
+    if (record.boardedAtSeconds - previousBoardedAt < quantize(manifest.config.simulation.gateHeadwaySeconds) - 1e-5) fail('admission headway inconsistent');
     previousBoardedAt = record.boardedAtSeconds;
+    for (const key of ['boardedAtSeconds', 'rowArrivalSeconds', 'seatedAtSeconds']) close(record[key], Math.round(record[key] / dt) * dt, 'timestamp grid');
+    close(record.gateWaitSeconds, record.boardedAtSeconds - passenger.gateArrivalSeconds, 'gate wait');
+    close(record.freeWalkingSeconds, parseSeat(passenger.seatNumber).row * quantize(passenger.behavior.walkSecondsPerRow), 'free walking');
+    close(record.rowArrivalSeconds - record.boardedAtSeconds, record.freeWalkingSeconds + record.aisleBlockingSeconds, 'row arrival');
+    close(record.rowServiceSeconds, record.assistanceSeconds + record.stowSeconds + record.seatInterferenceSeconds + record.seatingSeconds, 'row service');
+    close(record.seatedAtSeconds - record.rowArrivalSeconds, record.rowServiceSeconds, 'seating completion');
+    close(record.inAisleSeconds, record.seatedAtSeconds - record.boardedAtSeconds, 'in-aisle duration');
+    close(record.stowSeconds, quantize(passenger.actualBaggage.overheadPieces * passenger.behavior.stowSecondsPerBag), 'stowing duration');
+    close(record.seatingSeconds, quantize(passenger.behavior.seatSeconds), 'seating duration');
+    const assistance = passenger.assistance.type === 'MOBILITY' ? manifest.config.simulation.mobilityAssistanceSeconds
+      : passenger.assistance.type === 'EXTRA_TIME' ? manifest.config.simulation.extraTimeAssistanceSeconds : 0;
+    close(record.assistanceSeconds, quantize(assistance), 'assistance duration');
     const expected = record.freeWalkingSeconds + record.aisleBlockingSeconds + record.rowServiceSeconds;
     if (Math.abs(record.inAisleSeconds - expected) > 1e-5 || record.aisleBlockingSeconds < 0) fail('aisle time does not reconcile');
+  }
+  const bySeat = new Map(timings.map(record => [record.seatNumber, record]));
+  for (const record of timings) {
+    const blockers = blockingSeats(record.seatNumber).filter(seat => bySeat.has(seat) && bySeat.get(seat).seatedAtSeconds <= record.rowArrivalSeconds);
+    close(record.seatInterferenceCount, blockers.length, 'seat interference count');
+    close(record.seatInterferenceSeconds, quantize(blockers.length * manifest.config.simulation.seatInterferenceSecondsPerBlocker), 'seat interference duration');
   }
   const preboardEnd = Math.max(0, ...timings.filter(r => r.stage === 'PREBOARD').map(r => r.seatedAtSeconds));
   if (timings.some(r => r.stage !== 'PREBOARD' && r.boardedAtSeconds < preboardEnd)) fail('preboarding seating barrier violated');
@@ -230,7 +301,25 @@ export function auditResult(manifest, result, { requireFullFlight = true } = {})
     }
   }
   const expectedEnd = Math.max(0, ...timings.map(r => r.seatedAtSeconds));
-  if (Math.abs(expectedEnd - result.metrics.totalBoardingSeconds) > 1e-5) fail('completion metric inconsistent');
+  for (const [key, value] of Object.entries(result.metrics)) if (!Number.isFinite(value) || value < 0) fail(`invalid metric ${key}`);
+  close(result.metrics.totalBoardingSeconds, expectedEnd, 'completion metric');
+  close(result.metrics.passengerCount, timings.length, 'passenger count metric');
+  close(result.metrics.activeBoardingSeconds, timings.length ? expectedEnd - timings[0].boardedAtSeconds : 0, 'active boarding metric');
+  close(result.metrics.totalGateWaitSeconds, sum(timings, 'gateWaitSeconds'), 'total gate wait metric');
+  close(result.metrics.meanGateWaitSeconds, timings.length ? sum(timings, 'gateWaitSeconds') / timings.length : 0, 'mean gate wait metric');
+  close(result.metrics.maxGateWaitSeconds, Math.max(0, ...timings.map(r => r.gateWaitSeconds)), 'maximum gate wait metric');
+  close(result.metrics.aisleBlockingPersonSeconds, sum(timings, 'aisleBlockingSeconds'), 'aisle blocking metric');
+  if (result.metrics.aisleBlockingPersonMinutes !== undefined) close(result.metrics.aisleBlockingPersonMinutes, sum(timings, 'aisleBlockingSeconds') / 60, 'blocking minutes metric');
+  close(result.metrics.meanAisleBlockingSeconds, timings.length ? sum(timings, 'aisleBlockingSeconds') / timings.length : 0, 'mean aisle blocking metric');
+  for (const [metric, key] of [['rowServicePersonSeconds', 'rowServiceSeconds'], ['stowPersonSeconds', 'stowSeconds'],
+    ['seatInterferencePersonSeconds', 'seatInterferenceSeconds'], ['seatInterferenceCount', 'seatInterferenceCount']]) close(result.metrics[metric], sum(timings, key), metric);
+  let concurrent = 0;
+  let peak = 0;
+  const boundaries = timings.flatMap(record => [[record.boardedAtSeconds, 1], [record.seatedAtSeconds, -1]])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  for (const [, delta] of boundaries) { concurrent += delta; peak = Math.max(peak, concurrent); }
+  close(result.metrics.maxConcurrentInAisle, peak, 'peak occupancy metric');
+  if (peak > manifest.config.aircraft.rows + 1) fail('aisle queue exceeds cell capacity');
   return {
     passed: true,
     seatedExactlyOnce: ids.size,
