@@ -1,0 +1,12 @@
+{
+  "name": "boardingflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent synthetic aircraft boarding simulation CLI",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node src/cli.js demo --seed 42 --output results --trace"
+  }
+}

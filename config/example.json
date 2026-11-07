@@ -1,0 +1,11 @@
+{
+  "generation": {
+    "overheadBagProbability": 0.8,
+    "lateArrivalProbability": 0.05
+  },
+  "simulation": {
+    "tickSeconds": 0.5,
+    "gateHeadwaySeconds": 2,
+    "seatInterferenceSecondsPerBlocker": 8
+  }
+}
