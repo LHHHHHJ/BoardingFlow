@@ -1,0 +1,16 @@
+{
+  "generation": {
+    "travelClassProbabilities": {
+      "ECONOMY": 0.8,
+      "PREMIUM_ECONOMY": 0.15,
+      "BUSINESS": 0.05
+    },
+    "priorityProbability": 0.15,
+    "assistanceProbability": 0.04,
+    "partyProbability": 0.6,
+    "partySizeMin": 2,
+    "partySizeMax": 6,
+    "overheadBagProbability": 0.75,
+    "personalItemProbability": 0.9
+  }
+}

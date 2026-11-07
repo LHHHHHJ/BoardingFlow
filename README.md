@@ -4,6 +4,20 @@ An independent command-line prototype for a synthetic 180-passenger flight: 30 r
 
 The official challenge repository was inspected read-only. This project contains original simulation code and **entirely synthetic passengers**. It does not import official passenger records or alter the official repository. See [the source mapping](docs/OFFICIAL_REFERENCE.md).
 
+## Stage 1 passenger dataset checklist
+
+The Stage 1 audit adds an independent `travelClass` field, configurable passenger-class mix and party-size bounds, and a per-passenger allowance-versus-actual baggage report. It reuses the existing generator and validation. See [the requirement audit, assumptions and file changes](docs/STAGE1_AUDIT.md).
+
+```powershell
+cd .\BoardingFlow
+node src/cli.js generate --seed 42 --output data/stage1-passengers.json
+node src/cli.js validate --input data/stage1-passengers.json
+node src/cli.js audit-dataset --input data/stage1-passengers.json --output results/stage1/dataset-audit.json
+node --test
+```
+
+Use `--config config/stage1.example.json` with `generate` to change class/priority/assistance mix, carry-on rates and party-size bounds. New datasets use schema 2. Saved schema 1 inputs still work; their missing class labels are reported as unknown by the new audit. New metadata changes generated input fingerprints while default physical passenger draws and simulation completion times remain unchanged.
+
 ## Run everything
 
 From the parent workspace in PowerShell:
@@ -64,17 +78,21 @@ BoardingFlow/
     random.js                Deterministic random streams and shuffling
     generate.js              Synthetic flight and passenger generation
     model.js                 Seat geometry, input validation, canonical fingerprint
+    baggage.js               Allowance-versus-actual carry-on audit
+    dataset-audit.js         Stage 1 dataset summary and baggage evidence
     strategies.js            Shared party/stage rules and strategy ordering
     simulate.js              Spatial simulation and result invariant audit
     compare.js               Immutable shared-input comparison
     io.js                    JSON/CSV exports and CLI result formatting
     cli.js                   generate, validate, simulate, compare, demo
   config/example.json        Partial configuration override example
+  config/stage1.example.json Passenger class/mix, carry-on and group-size overrides
   test/                      Data, physical-model, policy and CLI tests
   docs/
     OFFICIAL_REFERENCE.md    Official schema inspection and synthetic extensions
     MODEL.md                 Assumptions, algorithm and metric definitions
     RESULTS.md               Measured default seed-42 results
+    STAGE1_AUDIT.md           Passenger dataset requirement audit and verification
   data/                      Created by the generate command
   results/                   Created by demo/compare; generated files are gitignored
 ```

@@ -8,7 +8,8 @@ All assumptions are configurable in `src/config.js`; `--config` accepts partial 
 | --- | --- |
 | Capacity | 180, full flight |
 | Time origin | Synthetic boarding opening, November 7, 2026, 17:00 UTC (noon Waterloo time) |
-| Party construction | Within each three-seat row side, 55% probability of proposing a party of 2–3; truncate to available seats |
+| Party construction | 55% probability of proposing a party; configurable requested size, default 2–3. Default bounds retain row-side clipping; custom bounds keep parties intact across sides/rows, limited by the final capacity remainder |
+| Travel class | Independent synthetic fare labels: Economy 85%, Premium Economy 10%, Business 5%; configurable probabilities summing to one |
 | Priority entitlement | Independent 12% probability per passenger |
 | Assistance | Independent 2.5%; equal chance of `MOBILITY` or `EXTRA_TIME` |
 | Other mandatory preboarding | 1% probability among passengers without assistance |
@@ -30,9 +31,11 @@ All assumptions are configurable in `src/config.js`; `--config` accepts partial 
 
 Probability draws do not guarantee exact percentages. Priority entitlement, party promotion and preboarding overlap. Parties are given the earliest stage held by any member; counts of stages can exceed counts of individually eligible passengers.
 
-The baggage generator produces compliant cabin baggage. Imported excess or overweight cabin baggage is rejected for resolution before simulation; the prototype does not silently allow it aboard. Personal items use the sampled seating/handling time and do not consume overhead stow time. Check-in and security fields represent completed clearance, not a check-in/security queue simulation. Any uncleared status or inconsistent timestamp sequence is rejected.
+Travel class, boarding zone, priority entitlement and assistance are separate fields. Class does not infer any of the others, change the uniform seat geometry, or automatically increase the synthetic cabin allowance. Class sampling uses a separate random stream so changing only class probabilities leaves physical inputs unchanged. Party bounds use `generation.partySizeMin`/`partySizeMax`; see [Stage 1 configuration and migration details](STAGE1_AUDIT.md).
 
-All `*Seconds` timestamps are relative to the manifest's `flight.boardingOpenTime`. CSV exports also include UTC clearance and estimated-arrival timestamps. The estimate becomes the actual release time in this deterministic simulation. There is no separate arrival prediction error model.
+The baggage generator produces compliant cabin baggage. Imported excess or overweight cabin baggage is rejected for resolution before simulation; the prototype does not silently allow it aboard. `audit-dataset` can inspect and report those violations without running a simulation. Personal items use the sampled seating/handling time and do not consume overhead stow time. Check-in and security fields represent completed clearance, not a check-in/security queue simulation. Any uncleared status or inconsistent timestamp sequence is rejected.
+
+All `*Seconds` timestamps are relative to the manifest's `flight.boardingOpenTime`. CSV exports include UTC clearance timestamps and retain the original `estimatedGateArrivalUTC` alias for compatibility. `gateArrivalSeconds` is execution truth; dataset auditing does not change arrival timing.
 
 ## Shared boarding policies
 

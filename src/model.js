@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { makeConfig } from './config.js';
+import { makeConfig, TRAVEL_CLASSES } from './config.js';
+import { auditCarryOn } from './baggage.js';
 
 export const ASSISTANCE_TYPES = ['NONE', 'MOBILITY', 'EXTRA_TIME'];
 export const STAGE_NAMES = ['PREBOARD', 'PRIORITY', 'GENERAL'];
@@ -44,12 +45,20 @@ export function deepFreeze(value) {
   return value;
 }
 
-export function validateManifest(manifest, { requireFullFlight = true } = {}) {
+export function validateManifest(manifest, { requireFullFlight = true, allowNoncompliantBaggage = false } = {}) {
   const fail = message => { throw new Error(`Invalid manifest: ${message}`); };
-  if (!manifest || manifest.schemaVersion !== 1 || manifest.dataKind !== 'SYNTHETIC') fail('expected schemaVersion 1, SYNTHETIC data');
+  if (!manifest || ![1, 2].includes(manifest.schemaVersion) || manifest.dataKind !== 'SYNTHETIC') fail('expected schemaVersion 1 or 2, SYNTHETIC data');
   if (!Number.isSafeInteger(manifest.seed) || manifest.seed < 0 || manifest.seed > 0xFFFFFFFF) fail('seed must be uint32');
   const config = makeConfig(manifest.config);
-  if (canonicalJSON(config) !== canonicalJSON(manifest.config)) fail('config must be complete; use generate or demo to create a manifest');
+  const expectedConfig = structuredClone(config);
+  if (manifest.schemaVersion === 1) {
+    // Accept complete original configurations without mutating their bytes or
+    // inventing a travel class for previously saved Phase 1/2 passengers.
+    for (const key of ['partySizeMin', 'partySizeMax', 'travelClassProbabilities']) {
+      if (!Object.hasOwn(manifest.config?.generation ?? {}, key)) delete expectedConfig.generation[key];
+    }
+  }
+  if (canonicalJSON(expectedConfig) !== canonicalJSON(manifest.config)) fail('config must be complete; use generate or demo to create a manifest');
   const { flight, passengers } = manifest;
   if (!flight || typeof flight.flightId !== 'string' || !flight.flightId
       || !Number.isFinite(Date.parse(flight.boardingOpenTime))) fail('flight ID and boardingOpenTime required');
@@ -74,6 +83,8 @@ export function validateManifest(manifest, { requireFullFlight = true } = {}) {
     if (row < 1 || row > config.aircraft.rows || seats.has(passenger.seatNumber)) fail('duplicate or out-of-range seat');
     seats.add(passenger.seatNumber);
     if (![1, 2, 3].includes(passenger.boardingZone)) fail('boardingZone must be 1, 2 or 3');
+    if ((manifest.schemaVersion >= 2 || Object.hasOwn(passenger, 'travelClass'))
+        && !TRAVEL_CLASSES.includes(passenger.travelClass)) fail('travelClass must be ECONOMY, PREMIUM_ECONOMY or BUSINESS');
     if (typeof passenger.priorityEligible !== 'boolean' || typeof passenger.mandatoryPreboarding !== 'boolean') fail('boarding rights must be boolean');
     if (passenger.checkInStatus !== 'CLEARED' || passenger.securityStatus !== 'CLEARED') fail(`${passenger.id}: check-in and security must be CLEARED`);
     for (const key of ['checkInAtSeconds', 'securityClearedAtSeconds', 'gateArrivalSeconds']) finite(passenger[key], key);
@@ -89,11 +100,14 @@ export function validateManifest(manifest, { requireFullFlight = true } = {}) {
     for (const key of ['overheadPieces', 'personalItems']) {
       count(allowance[key], `allowance.${key}`);
       count(bags[key], `actualBaggage.${key}`);
-      if (bags[key] > allowance[key]) fail('excess cabin baggage must be resolved before simulation');
     }
     finite(allowance.maxOverheadWeightKg, 'maxOverheadWeightKg', 0);
     finite(bags.overheadWeightKg, 'overheadWeightKg', 0);
-    if (bags.overheadWeightKg > bags.overheadPieces * allowance.maxOverheadWeightKg) fail('overweight cabin baggage');
+    const baggageAudit = auditCarryOn(passenger);
+    if (!allowNoncompliantBaggage) {
+      if (baggageAudit.excessOverheadPieces || baggageAudit.excessPersonalItems) fail('excess cabin baggage must be resolved before simulation');
+      if (!baggageAudit.compliant) fail('overweight cabin baggage');
+    }
     if (!passenger.behavior) fail('sampled behavior required');
     for (const key of ['walkSecondsPerRow', 'seatSeconds', 'stowSecondsPerBag']) finite(passenger.behavior[key], key, 0);
     if (passenger.behavior.walkSecondsPerRow <= 0 || passenger.behavior.seatSeconds <= 0) fail('walking and seating durations must be positive');

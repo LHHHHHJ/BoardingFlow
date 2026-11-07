@@ -5,6 +5,7 @@ import { generateFlight } from './generate.js';
 import { deepFreeze, validateManifest } from './model.js';
 import { readJSON, resultTable, writeArtifacts, writeJSON } from './io.js';
 import { simulate } from './simulate.js';
+import { auditPassengerDataset } from './dataset-audit.js';
 
 const HELP = `BoardingFlow - independent SYNTHETIC boarding simulation (Node.js >=22)
 
@@ -12,11 +13,15 @@ Run from the BoardingFlow folder. No install step or external packages required.
 
   node src/cli.js generate --seed 42 --output data/synthetic-flight.json
   node src/cli.js validate --input data/synthetic-flight.json
+  node src/cli.js audit-dataset --input data/synthetic-flight.json --output results/stage1/dataset-audit.json
   node src/cli.js simulate --input data/synthetic-flight.json --strategy random --output results/random --trace
   node src/cli.js compare --input data/synthetic-flight.json --output results --trace
   node src/cli.js demo --seed 42 --output results --trace
 
 generate/demo: optional --config config/example.json (partial assumption overrides).
+Stage 1 mix/group example: --config config/stage1.example.json.
+audit-dataset: reports class/mix/group sizes and allowance vs actual carry-on;
+  exits 1 if the 180-passenger Stage 1 checklist is incomplete, while saving the report.
 simulate: --strategy random | zone | baggage-aware (default random).
 simulate/compare: reuse the complete config and passenger behavior stored in the input.
 --trace writes cell movement and row service events; --help prints this message.
@@ -29,6 +34,7 @@ function parseArguments(argv) {
   const allowed = {
     generate: ['seed', 'config', 'output'],
     validate: ['input'],
+    'audit-dataset': ['input', 'output'],
     simulate: ['input', 'strategy', 'output', 'trace'],
     compare: ['input', 'output', 'trace'],
     demo: ['seed', 'config', 'output', 'trace']
@@ -47,7 +53,7 @@ function parseArguments(argv) {
       options[key] = value;
     }
   }
-  if (['validate', 'simulate', 'compare'].includes(command) && !options.input) throw new Error(`${command} requires --input`);
+  if (['validate', 'simulate', 'compare', 'audit-dataset'].includes(command) && !options.input) throw new Error(`${command} requires --input`);
   if (options.seed !== undefined && !/^\d+$/.test(options.seed)) throw new Error('seed must be uint32');
   return { command, options };
 }
@@ -61,6 +67,20 @@ async function main() {
     manifest = generateFlight(Number(options.seed ?? 42), overrides);
   } else {
     manifest = await readJSON(options.input);
+  }
+  if (command === 'audit-dataset') {
+    const report = auditPassengerDataset(manifest);
+    const output = resolve(options.output ?? 'results/stage1/dataset-audit.json');
+    await writeJSON(output, report);
+    console.log(`Stage 1 dataset | SYNTHETIC | seed=${manifest.seed} | passengers=${report.validation.passengerCount}/${report.validation.capacity}`);
+    console.log(`Input SHA-256: ${report.inputHash}`);
+    console.log(`Travel classes: ${JSON.stringify(report.passengerMix.travelClasses)}; unknown=${report.passengerMix.unknownClassCount}`);
+    console.log(`Parties: ${report.travelParties.partyCount}; solo passengers: ${report.travelParties.soloPassengerCount}; sizes: ${JSON.stringify(report.travelParties.partySizeCounts)}`);
+    console.log(`Carry-on: ${report.carryOn.actualOverheadPieces}/${report.carryOn.allowedOverheadPieces} overhead pieces; ${report.carryOn.noncompliantPassengers} noncompliant passengers.`);
+    console.log(`${report.stage1Complete ? 'PASS' : 'INCOMPLETE'}: Stage 1 dataset checklist. Report: ${output}`);
+    for (const note of report.notes) console.log(note);
+    if (!report.stage1Complete) process.exitCode = 1;
+    return;
   }
   const validation = validateManifest(manifest);
   console.log(`BoardingFlow | SYNTHETIC | seed=${manifest.seed} | passengers=${validation.passengerCount}/${validation.capacity}`);

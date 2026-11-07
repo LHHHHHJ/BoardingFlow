@@ -1,7 +1,12 @@
+export const TRAVEL_CLASSES = ['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS'];
+
 export const DEFAULT_CONFIG = {
   aircraft: { rows: 30, seatLetters: 'ABCDEF' },
   generation: {
     partyProbability: 0.55,
+    partySizeMin: 2,
+    partySizeMax: 3,
+    travelClassProbabilities: { ECONOMY: 0.85, PREMIUM_ECONOMY: 0.1, BUSINESS: 0.05 },
     priorityProbability: 0.12,
     assistanceProbability: 0.025,
     additionalPreboardingProbability: 0.01,
@@ -50,11 +55,23 @@ export function makeConfig(overrides = {}) {
     throw new Error('aircraft.rows must be an integer in [1, 100]');
   }
   if (aircraft.seatLetters !== 'ABCDEF') throw new Error('This model requires six seats ABCDEF');
-  for (const [key, value] of [...Object.entries(gen), ...Object.entries(sim)]) {
+  for (const [key, value] of [...Object.entries(gen).filter(([key]) => key !== 'travelClassProbabilities'), ...Object.entries(sim)]) {
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${key} must be finite`);
     if (key.endsWith('Probability') && (value < 0 || value > 1)) throw new Error(`${key} must be in [0, 1]`);
     if (!key.includes('Arrival') && value < 0) throw new Error(`${key} cannot be negative`);
   }
+  if (!Number.isSafeInteger(gen.partySizeMin) || !Number.isSafeInteger(gen.partySizeMax)
+      || gen.partySizeMin < 2 || gen.partySizeMin > gen.partySizeMax || gen.partySizeMax > aircraft.rows * 6) {
+    throw new Error('partySizeMin/partySizeMax must be integers with 2 <= min <= max <= aircraft capacity');
+  }
+  let classProbabilityTotal = 0;
+  for (const [name, probability] of Object.entries(gen.travelClassProbabilities)) {
+    if (typeof probability !== 'number' || !Number.isFinite(probability) || probability < 0 || probability > 1) {
+      throw new Error(`travelClassProbabilities.${name} must be in [0, 1]`);
+    }
+    classProbabilityTotal += probability;
+  }
+  if (Math.abs(classProbabilityTotal - 1) > 1e-9) throw new Error('travelClassProbabilities must sum to 1');
   for (const key of ['earlyArrivalMinSeconds', 'earlyArrivalMaxSeconds', 'lateArrivalMinSeconds', 'lateArrivalMaxSeconds']) {
     if (!Number.isInteger(gen[key])) throw new Error(`${key} must be integer seconds`);
   }

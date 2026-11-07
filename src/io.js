@@ -32,6 +32,7 @@ export function passengerRows(manifest) {
     passengerId: passenger.id,
     flightId: passenger.flightId,
     seatNumber: passenger.seatNumber,
+    travelClass: passenger.travelClass ?? null,
     boardingZone: passenger.boardingZone,
     priorityEligible: passenger.priorityEligible,
     mandatoryPreboarding: passenger.mandatoryPreboarding,
