@@ -1,5 +1,7 @@
 import { blockingSeats, manifestHash, parseSeat, STAGE_NAMES, validateManifest } from './model.js';
 import { boardingUnits, orderUnits, readyUnit } from './strategies.js';
+import { validateScenario } from './scenarios.js';
+import { createReadinessObserver } from './readiness.js';
 import { constraintReport } from './constraints.js';
 import { createTraceMetadata, validateSimulationTrace } from './trace.js';
 
@@ -8,7 +10,9 @@ const sum = (items, key) => clean(items.reduce((total, item) => total + item[key
 
 export function simulate(manifest, strategy, { trace = false, requireFullFlight = true } = {}) {
   validateManifest(manifest, { requireFullFlight });
+  if (manifest.phase2) validateScenario(manifest, { requireFullFlight });
   const pending = orderUnits(manifest, strategy);
+  const observer = manifest.phase2 ? createReadinessObserver(manifest) : null;
   const { simulation: config, aircraft } = manifest.config;
   const dt = config.tickSeconds;
   const ticks = seconds => Math.ceil(seconds / dt - 1e-10);
@@ -73,6 +77,7 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
   const maxTicks = Math.floor(config.maxSimulationSeconds / dt + 1e-10);
   for (let tick = 0; tick <= maxTicks; tick++) {
     completionTick = tick;
+    observer?.advance(seconds(tick));
     // Row cells are held until service finishes. Events at a boundary use
     // half-open occupancy intervals: release, movement, then admission.
     for (let cell = 1; cell <= aircraft.rows; cell++) {
@@ -132,7 +137,15 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
 
     if (tick >= nextAdmissionTick && !escortUnit) {
       if (!activeUnit) {
-        const candidate = readyUnit(pending, stage, seconds(tick), strategy);
+        let candidate;
+        if (observer) {
+          const units = pending.filter(unit => unit.stage === stage);
+          const zone = strategy === 'zone' && stage === 2 ? Math.min(...units.map(unit => unit.zone)) : null;
+          candidate = units.find(unit => (zone === null || unit.zone === zone)
+            && unit.members.every(p => observer.isReadyAtGate(p.id)));
+        } else {
+          candidate = readyUnit(pending, stage, seconds(tick), strategy);
+        }
         // An assisted party reserves the otherwise empty aisle and escort.
         if (candidate && (!candidate.assisted || !occupied())) {
           activeUnit = candidate;
@@ -157,7 +170,7 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
             gateBlockedSinceTick = null;
           }
           const passenger = activeUnit.members[memberIndex++];
-          if (seconds(tick) < passenger.gateArrivalSeconds) {
+          if (seconds(tick) < passenger.gateArrivalSeconds || (observer && !observer.isReadyAtGate(passenger.id))) {
             throw new Error('Execution guard: passenger is not actually cleared and present at gate');
           }
           const { row } = parseSeat(passenger.seatNumber);

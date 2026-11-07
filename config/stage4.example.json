@@ -1,0 +1,17 @@
+{
+  "eta": {
+    "walkingSpeedMps": 0.9,
+    "assistedWalkingSpeedMps": 0.6,
+    "estimatedSecuritySeconds": 300,
+    "minimumRemainingSecuritySeconds": 30,
+    "stopProbability": 0.35,
+    "stopDelayMinSeconds": 45,
+    "stopDelayMaxSeconds": 240,
+    "overdueRecheckSeconds": 15
+  },
+  "scenarios": {
+    "securityDelayProbability": 0.4,
+    "securityDelayMinSeconds": 600,
+    "securityDelayMaxSeconds": 1200
+  }
+}

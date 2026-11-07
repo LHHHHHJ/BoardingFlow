@@ -44,6 +44,25 @@ This runs 99 simulations: 11 seeds, three synthetic arrival cases, three baselin
 
 Baggage-aware wins completion against random in 9 of 11 seeds per case, but loses in seeds 1 and 9 and slightly increases average gate waiting. See [the six-item Stage 3 audit](docs/STAGE3_AUDIT.md) and [measured comparison/test results](docs/STAGE3_RESULTS.md). This stage adds no adaptive features, dashboard or ML.
 
+## Stage 4 check-in, security and gate ETA verification
+
+Stage 4 reuses the local Phase 2 journey/observation implementation. It adds missing-scan handling, explicit event-order and decision-time checks, an accessible-route audit, and richer post-run ETA error reporting. The synthetic terminal geometry, default generation draws and adaptive strategy remain unchanged.
+
+```powershell
+node src/cli.js generate --scenario normal --seed 42 --output data/stage4-normal.json
+node src/cli.js readiness --input data/stage4-normal.json --at 0 --output results/stage4/readiness-0.json
+node src/cli.js terminal-audit --input data/stage4-normal.json --output results/stage4/terminal-audit.json
+node src/cli.js eta-evaluate --input data/stage4-normal.json --times 0,300,600 --output results/stage4/normal
+node src/cli.js generate --scenario security-delays --seed 42 --output data/stage4-security.json
+node src/cli.js eta-evaluate --input data/stage4-security.json --times 0,300,600 --output results/stage4/security-delays
+node --test test/stage4.test.js
+node --test
+```
+
+Use `--phase2-config config/stage4.example.json` with `generate --scenario ...` to change walking speed, estimated screening duration and possible stops without configuring adaptive optimization. Security entrance remains `SCREENING` until a separate clearance observation. Missing required clearance/check-in/gate evidence blocks boarding; it is never reconstructed from hidden actual times. ETA error output is evaluation data and does not feed decisions.
+
+See [the six-item Stage 4 audit and official-map reference boundary](docs/STAGE4_AUDIT.md) and [actual accuracy/test results](docs/STAGE4_RESULTS.md). The retained route lengths and accessibility flags are invented model assumptions, **not official Toronto Pearson measurements**. No map artwork is included.
+
 ## Run everything
 
 From the parent workspace in PowerShell:

@@ -50,7 +50,12 @@ export function passengerRows(manifest) {
     securityClearedAtSeconds: passenger.securityClearedAtSeconds,
     securityClearedAtUTC: absolute(passenger.securityClearedAtSeconds),
     gateArrivalSeconds: passenger.gateArrivalSeconds,
-    estimatedGateArrivalUTC: absolute(passenger.gateArrivalSeconds),
+    ...(manifest.phase2 ? {
+      actualGateArrivalSeconds: passenger.gateArrivalSeconds,
+      actualGateArrivalUTC: absolute(passenger.gateArrivalSeconds),
+      securityScanAtSeconds: passenger.securityScanAtSeconds,
+      securityScanAtUTC: absolute(passenger.securityScanAtSeconds)
+    } : { estimatedGateArrivalUTC: absolute(passenger.gateArrivalSeconds) }),
     travelPartyId: passenger.travelPartyId,
     assistanceType: passenger.assistance.type,
     companionId: passenger.assistance.companionId,
