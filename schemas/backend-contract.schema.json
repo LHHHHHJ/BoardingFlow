@@ -1,0 +1,5498 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:boardingflow:backend-contract:1",
+  "title": "BoardingFlow canonical backend export contract v1 (Stage 6)",
+  "$comment": "These are canonical JSON export shapes, not a replacement for domain validation. No wire version fields are invented. Select a $defs fragment for non-manifest artifacts. Older saved manifests can omit the adaptive settings block: regenerate through the committed CLI before using the controller.",
+  "$ref": "#/$defs/Manifest",
+  "$defs": {
+    "Strategy": {
+      "enum": [
+        "random",
+        "zone",
+        "baggage-aware",
+        "wilma",
+        "adaptive"
+      ]
+    },
+    "Stage": {
+      "enum": [
+        "PREBOARD",
+        "PRIORITY",
+        "GENERAL"
+      ]
+    },
+    "Seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "Seat": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*[A-F]$"
+    },
+    "Hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Class": {
+      "enum": [
+        "ECONOMY",
+        "PREMIUM_ECONOMY",
+        "BUSINESS"
+      ]
+    },
+    "Assistance": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "NONE",
+            "MOBILITY",
+            "EXTRA_TIME"
+          ]
+        },
+        "companionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "companionId"
+      ],
+      "additionalProperties": false
+    },
+    "Allowance": {
+      "type": "object",
+      "properties": {
+        "overheadPieces": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "personalItems": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "maxOverheadWeightKg": {
+          "type": "number",
+          "description": "Kilograms",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "overheadPieces",
+        "personalItems",
+        "maxOverheadWeightKg"
+      ],
+      "additionalProperties": false
+    },
+    "Baggage": {
+      "type": "object",
+      "properties": {
+        "overheadPieces": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "personalItems": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "overheadWeightKg": {
+          "type": "number",
+          "description": "Kilograms",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "overheadPieces",
+        "personalItems",
+        "overheadWeightKg"
+      ],
+      "additionalProperties": false
+    },
+    "Behavior": {
+      "type": "object",
+      "properties": {
+        "walkSecondsPerRow": {
+          "type": "number",
+          "description": "Sampled actual seconds/row; hidden from the controller",
+          "minimum": 0,
+          "exclusiveMinimum": 0
+        },
+        "stowSecondsPerBag": {
+          "type": "number",
+          "description": "Sampled actual seconds/overhead bag; hidden from controller",
+          "minimum": 0
+        },
+        "seatSeconds": {
+          "type": "number",
+          "description": "Sampled actual seating seconds",
+          "minimum": 0,
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "walkSecondsPerRow",
+        "stowSecondsPerBag",
+        "seatSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "PassengerV1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flightId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seatNumber": {
+          "$ref": "#/$defs/Seat"
+        },
+        "boardingZone": {
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "travelClass": {
+          "$ref": "#/$defs/Class"
+        },
+        "priorityEligible": {
+          "type": "boolean"
+        },
+        "mandatoryPreboarding": {
+          "type": "boolean"
+        },
+        "carryOnAllowance": {
+          "$ref": "#/$defs/Allowance"
+        },
+        "actualBaggage": {
+          "$ref": "#/$defs/Baggage"
+        },
+        "checkInStatus": {
+          "const": "CLEARED"
+        },
+        "securityStatus": {
+          "const": "CLEARED"
+        },
+        "travelPartyId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assistance": {
+          "$ref": "#/$defs/Assistance"
+        },
+        "behavior": {
+          "$ref": "#/$defs/Behavior"
+        },
+        "gateArrivalSeconds": {
+          "type": "number",
+          "description": "ACTUAL seconds relative to boardingOpenTime; may be negative. Not predicted/readiness data."
+        },
+        "securityClearedAtSeconds": {
+          "type": "number",
+          "description": "ACTUAL seconds relative to boardingOpenTime; may be negative. Not predicted/readiness data."
+        },
+        "checkInAtSeconds": {
+          "type": "number",
+          "description": "ACTUAL seconds relative to boardingOpenTime; may be negative. Not predicted/readiness data."
+        },
+        "securityScanAtSeconds": {
+          "type": "number",
+          "description": "Actual security entrance seconds; required on terminal scenarios, separate from clearance"
+        }
+      },
+      "required": [
+        "id",
+        "flightId",
+        "seatNumber",
+        "boardingZone",
+        "priorityEligible",
+        "mandatoryPreboarding",
+        "carryOnAllowance",
+        "actualBaggage",
+        "checkInStatus",
+        "securityStatus",
+        "travelPartyId",
+        "assistance",
+        "behavior",
+        "gateArrivalSeconds",
+        "securityClearedAtSeconds",
+        "checkInAtSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "Passenger": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flightId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seatNumber": {
+          "$ref": "#/$defs/Seat"
+        },
+        "boardingZone": {
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "travelClass": {
+          "$ref": "#/$defs/Class"
+        },
+        "priorityEligible": {
+          "type": "boolean"
+        },
+        "mandatoryPreboarding": {
+          "type": "boolean"
+        },
+        "carryOnAllowance": {
+          "$ref": "#/$defs/Allowance"
+        },
+        "actualBaggage": {
+          "$ref": "#/$defs/Baggage"
+        },
+        "checkInStatus": {
+          "const": "CLEARED"
+        },
+        "securityStatus": {
+          "const": "CLEARED"
+        },
+        "travelPartyId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assistance": {
+          "$ref": "#/$defs/Assistance"
+        },
+        "behavior": {
+          "$ref": "#/$defs/Behavior"
+        },
+        "gateArrivalSeconds": {
+          "type": "number",
+          "description": "ACTUAL seconds relative to boardingOpenTime; may be negative. Not predicted/readiness data."
+        },
+        "securityClearedAtSeconds": {
+          "type": "number",
+          "description": "ACTUAL seconds relative to boardingOpenTime; may be negative. Not predicted/readiness data."
+        },
+        "checkInAtSeconds": {
+          "type": "number",
+          "description": "ACTUAL seconds relative to boardingOpenTime; may be negative. Not predicted/readiness data."
+        },
+        "securityScanAtSeconds": {
+          "type": "number",
+          "description": "Actual security entrance seconds; required on terminal scenarios, separate from clearance"
+        }
+      },
+      "required": [
+        "id",
+        "flightId",
+        "seatNumber",
+        "boardingZone",
+        "travelClass",
+        "priorityEligible",
+        "mandatoryPreboarding",
+        "carryOnAllowance",
+        "actualBaggage",
+        "checkInStatus",
+        "securityStatus",
+        "travelPartyId",
+        "assistance",
+        "behavior",
+        "gateArrivalSeconds",
+        "securityClearedAtSeconds",
+        "checkInAtSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "Aircraft": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "seatLetters": {
+          "const": "ABCDEF"
+        }
+      },
+      "required": [
+        "rows",
+        "seatLetters"
+      ],
+      "additionalProperties": false
+    },
+    "Generation": {
+      "type": "object",
+      "properties": {
+        "partyProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "priorityProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "assistanceProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "additionalPreboardingProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "overheadBagProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "personalItemProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lateArrivalProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "partySizeMin": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "partySizeMax": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "travelClassProbabilities": {
+          "type": "object",
+          "properties": {
+            "ECONOMY": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "PREMIUM_ECONOMY": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "BUSINESS": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "ECONOMY",
+            "PREMIUM_ECONOMY",
+            "BUSINESS"
+          ],
+          "additionalProperties": false
+        },
+        "earlyArrivalMinSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "earlyArrivalMaxSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "lateArrivalMinSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "lateArrivalMaxSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "maxOverheadWeightKg": {
+          "type": "number",
+          "description": "Kilograms",
+          "minimum": 0
+        },
+        "stowSecondsPerBagMin": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "stowSecondsPerBagMax": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "seatSecondsMin": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "seatSecondsMax": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "walkSecondsPerRow": {
+          "type": "number",
+          "description": "Seconds per aircraft row",
+          "minimum": 0
+        },
+        "assistedWalkSecondsPerRow": {
+          "type": "number",
+          "description": "Seconds per aircraft row",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "partyProbability",
+        "priorityProbability",
+        "assistanceProbability",
+        "additionalPreboardingProbability",
+        "overheadBagProbability",
+        "personalItemProbability",
+        "lateArrivalProbability",
+        "partySizeMin",
+        "partySizeMax",
+        "travelClassProbabilities",
+        "earlyArrivalMinSeconds",
+        "earlyArrivalMaxSeconds",
+        "lateArrivalMinSeconds",
+        "lateArrivalMaxSeconds",
+        "maxOverheadWeightKg",
+        "stowSecondsPerBagMin",
+        "stowSecondsPerBagMax",
+        "seatSecondsMin",
+        "seatSecondsMax",
+        "walkSecondsPerRow",
+        "assistedWalkSecondsPerRow"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyGeneration": {
+      "type": "object",
+      "properties": {
+        "partyProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "priorityProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "assistanceProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "additionalPreboardingProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "overheadBagProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "personalItemProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lateArrivalProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "partySizeMin": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "partySizeMax": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "travelClassProbabilities": {
+          "type": "object",
+          "properties": {
+            "ECONOMY": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "PREMIUM_ECONOMY": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "BUSINESS": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "ECONOMY",
+            "PREMIUM_ECONOMY",
+            "BUSINESS"
+          ],
+          "additionalProperties": false
+        },
+        "earlyArrivalMinSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "earlyArrivalMaxSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "lateArrivalMinSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "lateArrivalMaxSeconds": {
+          "type": "integer",
+          "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+        },
+        "maxOverheadWeightKg": {
+          "type": "number",
+          "description": "Kilograms",
+          "minimum": 0
+        },
+        "stowSecondsPerBagMin": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "stowSecondsPerBagMax": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "seatSecondsMin": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "seatSecondsMax": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "walkSecondsPerRow": {
+          "type": "number",
+          "description": "Seconds per aircraft row",
+          "minimum": 0
+        },
+        "assistedWalkSecondsPerRow": {
+          "type": "number",
+          "description": "Seconds per aircraft row",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "partyProbability",
+        "priorityProbability",
+        "assistanceProbability",
+        "additionalPreboardingProbability",
+        "overheadBagProbability",
+        "personalItemProbability",
+        "lateArrivalProbability",
+        "earlyArrivalMinSeconds",
+        "earlyArrivalMaxSeconds",
+        "lateArrivalMinSeconds",
+        "lateArrivalMaxSeconds",
+        "maxOverheadWeightKg",
+        "stowSecondsPerBagMin",
+        "stowSecondsPerBagMax",
+        "seatSecondsMin",
+        "seatSecondsMax",
+        "walkSecondsPerRow",
+        "assistedWalkSecondsPerRow"
+      ],
+      "additionalProperties": false
+    },
+    "Simulation": {
+      "type": "object",
+      "properties": {
+        "tickSeconds": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1,
+          "description": "Seconds per engine tick"
+        },
+        "gateHeadwaySeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "seatInterferenceSecondsPerBlocker": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "mobilityAssistanceSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "extraTimeAssistanceSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "maxSimulationSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tickSeconds",
+        "gateHeadwaySeconds",
+        "seatInterferenceSecondsPerBlocker",
+        "mobilityAssistanceSeconds",
+        "extraTimeAssistanceSeconds",
+        "maxSimulationSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "Configuration": {
+      "type": "object",
+      "properties": {
+        "aircraft": {
+          "$ref": "#/$defs/Aircraft"
+        },
+        "generation": {
+          "$ref": "#/$defs/Generation"
+        },
+        "simulation": {
+          "$ref": "#/$defs/Simulation"
+        }
+      },
+      "required": [
+        "aircraft",
+        "generation",
+        "simulation"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyConfiguration": {
+      "type": "object",
+      "properties": {
+        "aircraft": {
+          "$ref": "#/$defs/Aircraft"
+        },
+        "generation": {
+          "$ref": "#/$defs/LegacyGeneration"
+        },
+        "simulation": {
+          "$ref": "#/$defs/Simulation"
+        }
+      },
+      "required": [
+        "aircraft",
+        "generation",
+        "simulation"
+      ],
+      "additionalProperties": false
+    },
+    "ConfigurationOverrides": {
+      "type": "object",
+      "properties": {
+        "aircraft": {
+          "type": "object",
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "seatLetters": {
+              "const": "ABCDEF"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "generation": {
+          "type": "object",
+          "properties": {
+            "partyProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "priorityProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "assistanceProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "additionalPreboardingProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "overheadBagProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "personalItemProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "lateArrivalProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "partySizeMin": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "partySizeMax": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "travelClassProbabilities": {
+              "type": "object",
+              "properties": {
+                "ECONOMY": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "PREMIUM_ECONOMY": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "BUSINESS": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            "earlyArrivalMinSeconds": {
+              "type": "integer",
+              "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+            },
+            "earlyArrivalMaxSeconds": {
+              "type": "integer",
+              "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+            },
+            "lateArrivalMinSeconds": {
+              "type": "integer",
+              "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+            },
+            "lateArrivalMaxSeconds": {
+              "type": "integer",
+              "description": "Seconds relative to opening; early bounds <= 0, late bounds >= 0"
+            },
+            "maxOverheadWeightKg": {
+              "type": "number",
+              "description": "Kilograms",
+              "minimum": 0
+            },
+            "stowSecondsPerBagMin": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "stowSecondsPerBagMax": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "seatSecondsMin": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "seatSecondsMax": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "walkSecondsPerRow": {
+              "type": "number",
+              "description": "Seconds per aircraft row",
+              "minimum": 0
+            },
+            "assistedWalkSecondsPerRow": {
+              "type": "number",
+              "description": "Seconds per aircraft row",
+              "minimum": 0
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "simulation": {
+          "type": "object",
+          "properties": {
+            "tickSeconds": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 1,
+              "description": "Seconds per engine tick"
+            },
+            "gateHeadwaySeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "seatInterferenceSecondsPerBlocker": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "mobilityAssistanceSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "extraTimeAssistanceSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "maxSimulationSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ETASettings": {
+      "type": "object",
+      "properties": {
+        "walkingSpeedMps": {
+          "type": "number",
+          "description": "Meters/second; terminal walking, distinct from aircraft row walking",
+          "minimum": 0
+        },
+        "assistedWalkingSpeedMps": {
+          "type": "number",
+          "description": "Meters/second; terminal walking, distinct from aircraft row walking",
+          "minimum": 0
+        },
+        "estimatedSecuritySeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "minimumRemainingSecuritySeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "stopDelayMinSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "stopDelayMaxSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "overdueRecheckSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "stopProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "walkingSpeedMps",
+        "assistedWalkingSpeedMps",
+        "estimatedSecuritySeconds",
+        "minimumRemainingSecuritySeconds",
+        "stopDelayMinSeconds",
+        "stopDelayMaxSeconds",
+        "overdueRecheckSeconds",
+        "stopProbability"
+      ],
+      "additionalProperties": false
+    },
+    "ScenarioSettings": {
+      "type": "object",
+      "properties": {
+        "securityDelayProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "latePartyProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "securityDelayMinSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "securityDelayMaxSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "lateStopMinSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        },
+        "lateStopMaxSeconds": {
+          "type": "number",
+          "description": "Seconds",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "securityDelayProbability",
+        "latePartyProbability",
+        "securityDelayMinSeconds",
+        "securityDelayMaxSeconds",
+        "lateStopMinSeconds",
+        "lateStopMaxSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyAdaptiveSettings": {
+      "type": "object",
+      "properties": {
+        "reviewIntervalSeconds": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "lookaheadSeconds": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "maxAnticipationWaitSeconds": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "waitCostPerSecond": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "minimumScoreImprovement": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "expectedStowSecondsPerBag": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "seatDepthWeight": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "rowWeight": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "zoneWeight": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "congestionWeight": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        },
+        "interferenceWeight": {
+          "type": "number",
+          "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "reviewIntervalSeconds",
+        "lookaheadSeconds",
+        "maxAnticipationWaitSeconds",
+        "waitCostPerSecond",
+        "minimumScoreImprovement",
+        "expectedStowSecondsPerBag",
+        "seatDepthWeight",
+        "rowWeight",
+        "zoneWeight",
+        "congestionWeight",
+        "interferenceWeight"
+      ],
+      "additionalProperties": false
+    },
+    "Phase2Settings": {
+      "type": "object",
+      "properties": {
+        "eta": {
+          "$ref": "#/$defs/ETASettings"
+        },
+        "scenarios": {
+          "$ref": "#/$defs/ScenarioSettings"
+        },
+        "adaptive": {
+          "$ref": "#/$defs/LegacyAdaptiveSettings"
+        }
+      },
+      "required": [
+        "eta",
+        "scenarios",
+        "adaptive"
+      ],
+      "additionalProperties": false
+    },
+    "Phase2Overrides": {
+      "type": "object",
+      "properties": {
+        "eta": {
+          "type": "object",
+          "properties": {
+            "walkingSpeedMps": {
+              "type": "number",
+              "description": "Meters/second; terminal walking, distinct from aircraft row walking",
+              "minimum": 0
+            },
+            "assistedWalkingSpeedMps": {
+              "type": "number",
+              "description": "Meters/second; terminal walking, distinct from aircraft row walking",
+              "minimum": 0
+            },
+            "estimatedSecuritySeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "minimumRemainingSecuritySeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "stopDelayMinSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "stopDelayMaxSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "overdueRecheckSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "stopProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "scenarios": {
+          "type": "object",
+          "properties": {
+            "securityDelayProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "latePartyProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "securityDelayMinSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "securityDelayMaxSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "lateStopMinSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "lateStopMaxSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "adaptive": {
+          "type": "object",
+          "properties": {
+            "reviewIntervalSeconds": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "lookaheadSeconds": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "maxAnticipationWaitSeconds": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "waitCostPerSecond": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "minimumScoreImprovement": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "expectedStowSecondsPerBag": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "seatDepthWeight": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "rowWeight": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "zoneWeight": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "congestionWeight": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            },
+            "interferenceWeight": {
+              "type": "number",
+              "description": "Legacy expected-delay configuration; see TEAM_HANDOFF.md for units",
+              "minimum": 0
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "AdaptiveSettings": {
+      "type": "object",
+      "properties": {
+        "expectedSeatSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "expectedWalkSecondsPerRow": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "expectedAssistedWalkSecondsPerRow": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "completionWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "inducedBlockingWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "pathDelayWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "seatAccessWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "baggageOverlapWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "rowWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "waitingSecondsPerMinute": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "waitingCreditCapSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "staleObservationSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "uncertaintyBaseSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "uncertaintyAgeWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "overdueUncertaintySeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "expectedSeatSeconds",
+        "expectedWalkSecondsPerRow",
+        "expectedAssistedWalkSecondsPerRow",
+        "completionWeight",
+        "inducedBlockingWeight",
+        "pathDelayWeight",
+        "seatAccessWeight",
+        "baggageOverlapWeight",
+        "rowWeight",
+        "waitingSecondsPerMinute",
+        "waitingCreditCapSeconds",
+        "staleObservationSeconds",
+        "uncertaintyBaseSeconds",
+        "uncertaintyAgeWeight",
+        "overdueUncertaintySeconds"
+      ],
+      "additionalProperties": false
+    },
+    "AdaptiveOverrides": {
+      "type": "object",
+      "properties": {
+        "expectedSeatSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "expectedWalkSecondsPerRow": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "expectedAssistedWalkSecondsPerRow": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "completionWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "inducedBlockingWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "pathDelayWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "seatAccessWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "baggageOverlapWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "rowWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "waitingSecondsPerMinute": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "waitingCreditCapSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "staleObservationSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "uncertaintyBaseSeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "uncertaintyAgeWeight": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        },
+        "overdueUncertaintySeconds": {
+          "type": "number",
+          "description": "V2 expectation/weight; see TEAM_HANDOFF.md for per-field units",
+          "minimum": 0
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "Terminal": {
+      "type": "object",
+      "properties": {
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "distanceMeters": {
+                "type": "number",
+                "description": "Invented walking distance, meters",
+                "minimum": 0
+              },
+              "accessible": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "distanceMeters",
+              "accessible"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "dataKind",
+        "description",
+        "nodes",
+        "edges"
+      ],
+      "additionalProperties": false
+    },
+    "Observation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "const": "CHECK_IN_CLEARED"
+            },
+            "timeSeconds": {
+              "type": "number",
+              "description": "Observed event time relative to opening; can be negative"
+            },
+            "checkpointId": {
+              "const": "CHECK_IN"
+            }
+          },
+          "required": [
+            "passengerId",
+            "type",
+            "timeSeconds",
+            "checkpointId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "const": "SECURITY_ENTERED"
+            },
+            "timeSeconds": {
+              "type": "number",
+              "description": "Observed event time relative to opening; can be negative"
+            },
+            "checkpointId": {
+              "const": "SECURITY_ENTRY"
+            }
+          },
+          "required": [
+            "passengerId",
+            "type",
+            "timeSeconds",
+            "checkpointId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "const": "SECURITY_CLEARED"
+            },
+            "timeSeconds": {
+              "type": "number",
+              "description": "Observed event time relative to opening; can be negative"
+            },
+            "checkpointId": {
+              "const": "SECURITY_EXIT"
+            }
+          },
+          "required": [
+            "passengerId",
+            "type",
+            "timeSeconds",
+            "checkpointId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "const": "CHECKPOINT"
+            },
+            "timeSeconds": {
+              "type": "number",
+              "description": "Observed event time relative to opening; can be negative"
+            },
+            "checkpointId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "passengerId",
+            "type",
+            "timeSeconds",
+            "checkpointId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "const": "GATE_ARRIVED"
+            },
+            "timeSeconds": {
+              "type": "number",
+              "description": "Observed event time relative to opening; can be negative"
+            },
+            "checkpointId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Assigned gate ID"
+            }
+          },
+          "required": [
+            "passengerId",
+            "type",
+            "timeSeconds",
+            "checkpointId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Phase2": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "scenarioName": {
+          "enum": [
+            "normal",
+            "security-delays",
+            "late-arrivals"
+          ]
+        },
+        "assignedGateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terminal": {
+          "$ref": "#/$defs/Terminal"
+        },
+        "settings": {
+          "$ref": "#/$defs/Phase2Settings"
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          }
+        },
+        "truth": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "passengerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actualSecurityProcessingSeconds": {
+                "type": "number",
+                "description": "Hidden actual seconds",
+                "minimum": 0
+              },
+              "actualWalkingSpeedMps": {
+                "type": "number",
+                "description": "Hidden actual meters/second",
+                "minimum": 0
+              },
+              "actualStopDelaySeconds": {
+                "type": "number",
+                "description": "Hidden actual seconds",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "passengerId",
+              "actualSecurityProcessingSeconds",
+              "actualWalkingSpeedMps",
+              "actualStopDelaySeconds"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "scenarioName",
+        "assignedGateId",
+        "terminal",
+        "settings",
+        "observations",
+        "truth"
+      ],
+      "additionalProperties": false
+    },
+    "Family": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memberIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "youngChildUnderFivePassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "guardianPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "id",
+        "memberIds",
+        "youngChildUnderFivePassengerIds",
+        "guardianPassengerIds"
+      ],
+      "additionalProperties": false
+    },
+    "AnimalArrangement": {
+      "type": "object",
+      "properties": {
+        "passengerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "PET",
+            "SERVICE_ANIMAL"
+          ]
+        },
+        "confirmed": {
+          "const": true
+        },
+        "boardingRequirement": {
+          "enum": [
+            "NONE",
+            "EXTRA_TIME",
+            "MOBILITY"
+          ]
+        }
+      },
+      "required": [
+        "passengerId",
+        "kind",
+        "confirmed",
+        "boardingRequirement"
+      ],
+      "additionalProperties": false
+    },
+    "StaffEvent": {
+      "type": "object",
+      "properties": {
+        "passengerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "STAFF_APPROVAL",
+            "GATE_VERIFICATION"
+          ]
+        },
+        "timeSeconds": {
+          "type": "number",
+          "description": "Observed confirmation time relative to opening; may be negative"
+        },
+        "confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "passengerId",
+        "kind",
+        "timeSeconds",
+        "confirmed"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRules": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "const": "BF-SWISS-INSPIRED-V1"
+        },
+        "status": {
+          "enum": [
+            "CONFIRMED",
+            "UNVERIFIED"
+          ]
+        },
+        "confirmedFirstClassPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "elitePriorityPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confirmedAssistancePassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "families": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Family"
+          }
+        },
+        "confirmedAnimalArrangements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnimalArrangement"
+          }
+        }
+      },
+      "required": [
+        "profileId",
+        "status",
+        "confirmedFirstClassPassengerIds",
+        "elitePriorityPassengerIds",
+        "confirmedAssistancePassengerIds",
+        "families"
+      ],
+      "additionalProperties": false
+    },
+    "Policy": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "const": "BF-SWISS-INSPIRED-V1"
+        },
+        "status": {
+          "enum": [
+            "CONFIRMED",
+            "UNVERIFIED"
+          ]
+        },
+        "confirmedFirstClassPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "elitePriorityPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confirmedAssistancePassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "families": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Family"
+          }
+        },
+        "confirmedAnimalArrangements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnimalArrangement"
+          }
+        },
+        "staffEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StaffEvent"
+          }
+        }
+      },
+      "required": [
+        "profileId",
+        "status",
+        "confirmedFirstClassPassengerIds",
+        "elitePriorityPassengerIds",
+        "confirmedAssistancePassengerIds",
+        "families",
+        "staffEvents"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyConfiguration": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "const": "BF-SWISS-INSPIRED-V1"
+        },
+        "status": {
+          "enum": [
+            "CONFIRMED",
+            "UNVERIFIED"
+          ]
+        },
+        "confirmedFirstClassPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "elitePriorityPassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confirmedAssistancePassengerIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "families": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Family"
+          }
+        },
+        "confirmedAnimalArrangements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnimalArrangement"
+          }
+        },
+        "staffEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StaffEvent"
+          }
+        },
+        "syntheticStaffConfirmation": {
+          "type": "object",
+          "properties": {
+            "approvalDelaySeconds": {
+              "type": "number",
+              "description": "Offline fixture delay after actual arrival; not a decision input",
+              "minimum": 0
+            },
+            "gateVerificationDelaySeconds": {
+              "type": "number",
+              "description": "Offline fixture delay after actual arrival; not a decision input",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "approvalDelaySeconds",
+            "gateVerificationDelaySeconds"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "Manifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "$ref": "#/$defs/Seed"
+        },
+        "flight": {
+          "type": "object",
+          "properties": {
+            "flightId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "aircraftType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "boardingOpenTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 UTC origin, not the system clock"
+            },
+            "timeConvention": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "flightId",
+            "aircraftType",
+            "boardingOpenTime",
+            "timeConvention"
+          ],
+          "additionalProperties": false
+        },
+        "config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Configuration"
+            },
+            {
+              "$ref": "#/$defs/LegacyConfiguration"
+            }
+          ]
+        },
+        "passengers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PassengerV1"
+          }
+        },
+        "phase2": {
+          "$ref": "#/$defs/Phase2"
+        },
+        "boardingPolicy": {
+          "$ref": "#/$defs/Policy"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "dataKind",
+        "provenance",
+        "seed",
+        "flight",
+        "config",
+        "passengers"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "schemaVersion": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "$ref": "#/$defs/LegacyConfiguration"
+              },
+              "passengers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/PassengerV1"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "schemaVersion": {
+                "const": 2
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "$ref": "#/$defs/Configuration"
+              },
+              "passengers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Passenger"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "phase2"
+            ],
+            "properties": {
+              "phase2": {}
+            }
+          },
+          "then": {
+            "properties": {
+              "passengers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "securityScanAtSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "securityScanAtSeconds"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Canonical generated exports. Cross-record constraints (unique seats, chronology, capacity, policy) require validateManifest/validateScenario, not schema alone.",
+      "dependentRequired": {
+        "boardingPolicy": [
+          "phase2"
+        ]
+      }
+    },
+    "ETAPrediction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "estimatedGateArrivalSeconds": {
+              "type": "null"
+            },
+            "reachable": {
+              "const": null
+            },
+            "basis": {
+              "const": "NO_OBSERVATION"
+            }
+          },
+          "required": [
+            "estimatedGateArrivalSeconds",
+            "reachable",
+            "basis"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "estimatedGateArrivalSeconds": {
+              "type": "null"
+            },
+            "reachable": {
+              "const": false
+            },
+            "basis": {
+              "const": "NO_ACCESSIBLE_ROUTE"
+            }
+          },
+          "required": [
+            "estimatedGateArrivalSeconds",
+            "reachable",
+            "basis"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "estimatedGateArrivalSeconds": {
+              "type": "number"
+            },
+            "reachable": {
+              "const": true
+            },
+            "remainingDistanceMeters": {
+              "const": 0
+            },
+            "route": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "securityRemainingSeconds": {
+              "const": 0
+            },
+            "expectedStopDelaySeconds": {
+              "const": 0
+            },
+            "basis": {
+              "const": "OBSERVED_AT_GATE"
+            }
+          },
+          "required": [
+            "estimatedGateArrivalSeconds",
+            "reachable",
+            "remainingDistanceMeters",
+            "route",
+            "securityRemainingSeconds",
+            "expectedStopDelaySeconds",
+            "basis"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "estimatedGateArrivalSeconds": {
+              "type": "number",
+              "description": "Predicted relative seconds, never actual hidden arrival"
+            },
+            "reachable": {
+              "const": true
+            },
+            "remainingDistanceMeters": {
+              "type": "number",
+              "description": "Meters along accessible routes",
+              "minimum": 0
+            },
+            "route": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "securityRemainingSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "expectedStopDelaySeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "observationAgeSeconds": {
+              "type": "number",
+              "description": "Seconds",
+              "minimum": 0
+            },
+            "overdue": {
+              "type": "boolean"
+            },
+            "securityOverdue": {
+              "type": "boolean"
+            },
+            "basis": {
+              "enum": [
+                "SECURITY_ENTRY_WITHOUT_CLEARANCE",
+                "LAST_OBSERVED_CHECKPOINT"
+              ]
+            }
+          },
+          "required": [
+            "estimatedGateArrivalSeconds",
+            "reachable",
+            "remainingDistanceMeters",
+            "route",
+            "securityRemainingSeconds",
+            "expectedStopDelaySeconds",
+            "observationAgeSeconds",
+            "overdue",
+            "securityOverdue",
+            "basis"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ReadyPassenger": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seatNumber": {
+          "$ref": "#/$defs/Seat"
+        },
+        "travelClass": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Class"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "boardingZone": {
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "priorityEligible": {
+          "type": "boolean"
+        },
+        "mandatoryPreboarding": {
+          "type": "boolean"
+        },
+        "travelPartyId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assistance": {
+          "$ref": "#/$defs/Assistance"
+        },
+        "carryOnAllowance": {
+          "$ref": "#/$defs/Allowance"
+        },
+        "declaredCabinBaggage": {
+          "$ref": "#/$defs/Baggage"
+        },
+        "checkIn": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "NOT_OBSERVED"
+                },
+                "clearedAtSeconds": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "status",
+                "clearedAtSeconds"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "CLEARED"
+                },
+                "clearedAtSeconds": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "status",
+                "clearedAtSeconds"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "security": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "NOT_OBSERVED"
+                },
+                "scanAtSeconds": {
+                  "type": "null"
+                },
+                "clearedAtSeconds": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "status",
+                "scanAtSeconds",
+                "clearedAtSeconds"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "SCREENING"
+                },
+                "scanAtSeconds": {
+                  "type": "number"
+                },
+                "clearedAtSeconds": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "status",
+                "scanAtSeconds",
+                "clearedAtSeconds"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "const": "CLEARED"
+                },
+                "scanAtSeconds": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "clearedAtSeconds": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "status",
+                "scanAtSeconds",
+                "clearedAtSeconds"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "lastCheckpoint": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "observedAtSeconds": {
+                  "type": "number",
+                  "description": "Past observed relative seconds"
+                }
+              },
+              "required": [
+                "id",
+                "observedAtSeconds"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gateObservedAtSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readyAtGate": {
+          "type": "boolean"
+        },
+        "prediction": {
+          "$ref": "#/$defs/ETAPrediction"
+        },
+        "readinessBlockers": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "CHECK_IN_NOT_OBSERVED",
+              "SECURITY_STILL_SCREENING",
+              "SECURITY_CLEARANCE_NOT_OBSERVED",
+              "GATE_NOT_OBSERVED"
+            ]
+          }
+        },
+        "likelyReadyWithinSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "description": "Predicted remaining seconds; not staff approval or authorization",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "seatNumber",
+        "travelClass",
+        "boardingZone",
+        "priorityEligible",
+        "mandatoryPreboarding",
+        "travelPartyId",
+        "assistance",
+        "carryOnAllowance",
+        "declaredCabinBaggage",
+        "checkIn",
+        "security",
+        "lastCheckpoint",
+        "gateObservedAtSeconds",
+        "readyAtGate",
+        "prediction",
+        "readinessBlockers",
+        "likelyReadyWithinSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "ReadinessSnapshot": {
+      "type": "object",
+      "properties": {
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "asOfSeconds": {
+          "type": "number"
+        },
+        "latestObservedAtSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedGateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passengers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReadyPassenger"
+          }
+        }
+      },
+      "required": [
+        "dataKind",
+        "asOfSeconds",
+        "latestObservedAtSeconds",
+        "assignedGateId",
+        "passengers"
+      ],
+      "additionalProperties": false
+    },
+    "PolicySnapshot": {
+      "type": "object",
+      "properties": {
+        "asOfSeconds": {
+          "type": "number"
+        },
+        "latestObservedAtSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rules": {
+          "$ref": "#/$defs/PolicyRules"
+        },
+        "passengers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "passengerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approval": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "confirmed": {
+                        "type": "boolean"
+                      },
+                      "atSeconds": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confirmed",
+                      "atSeconds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "gateVerification": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "confirmed": {
+                        "type": "boolean"
+                      },
+                      "atSeconds": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confirmed",
+                      "atSeconds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "passengerId",
+              "approval",
+              "gateVerification"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "asOfSeconds",
+        "latestObservedAtSeconds",
+        "rules",
+        "passengers"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyAdvisory": {
+      "type": "object",
+      "properties": {
+        "timeSeconds": {
+          "type": "number"
+        },
+        "advisory": {
+          "const": true
+        },
+        "simulationOnly": {
+          "const": true
+        },
+        "requiresStaffApproval": {
+          "const": true
+        },
+        "requiresGateVerification": {
+          "const": true
+        },
+        "action": {
+          "enum": [
+            "HOLD",
+            "RECOMMEND_BOARDING"
+          ]
+        },
+        "unitId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memberIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "simulationAdmissionAllowed": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profileId": {
+          "const": "BF-SWISS-INSPIRED-V1"
+        }
+      },
+      "required": [
+        "timeSeconds",
+        "advisory",
+        "simulationOnly",
+        "requiresStaffApproval",
+        "requiresGateVerification",
+        "action",
+        "unitId",
+        "memberIds",
+        "simulationAdmissionAllowed",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "Metrics": {
+      "type": "object",
+      "properties": {
+        "totalBoardingSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "activeBoardingSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "totalGateWaitSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "meanGateWaitSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "maxGateWaitSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "aisleBlockingPersonSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "aisleBlockingPersonMinutes": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "meanAisleBlockingSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "gateEntranceBlockedSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "rowServicePersonSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "stowPersonSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "seatInterferencePersonSeconds": {
+          "type": "number",
+          "description": "Units encoded by field name; see metrics table in TEAM_HANDOFF.md",
+          "minimum": 0
+        },
+        "passengerCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "seatInterferenceCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "maxConcurrentInAisle": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        },
+        "constraintViolationCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count"
+        }
+      },
+      "required": [
+        "totalBoardingSeconds",
+        "activeBoardingSeconds",
+        "totalGateWaitSeconds",
+        "meanGateWaitSeconds",
+        "maxGateWaitSeconds",
+        "aisleBlockingPersonSeconds",
+        "aisleBlockingPersonMinutes",
+        "meanAisleBlockingSeconds",
+        "gateEntranceBlockedSeconds",
+        "rowServicePersonSeconds",
+        "stowPersonSeconds",
+        "seatInterferencePersonSeconds",
+        "passengerCount",
+        "seatInterferenceCount",
+        "maxConcurrentInAisle",
+        "constraintViolationCount"
+      ],
+      "additionalProperties": false
+    },
+    "Constraints": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "earlyGateEntry": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "earlyCheckInEntry": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "earlySecurityEntry": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duplicatePassenger": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duplicateSeat": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wrongSeat": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missingPassenger": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "priorityStageOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "preboardingBarrier": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "splitTravelParty": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "assistanceConflict": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observedReadinessViolation": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "staffApprovalViolation": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gateVerificationViolation": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "familySeparation": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "earlyGateEntry",
+            "earlyCheckInEntry",
+            "earlySecurityEntry",
+            "duplicatePassenger",
+            "duplicateSeat",
+            "wrongSeat",
+            "missingPassenger",
+            "priorityStageOrder",
+            "preboardingBarrier",
+            "splitTravelParty",
+            "assistanceConflict"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "total",
+        "counts"
+      ],
+      "additionalProperties": false
+    },
+    "ResultValidation": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "const": true
+        },
+        "seatedExactlyOnce": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uniqueSeats": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gateArrivalRespected": {
+          "const": true
+        },
+        "priorityStagesRespected": {
+          "const": true
+        },
+        "partiesAndAssistanceRespected": {
+          "const": true
+        }
+      },
+      "required": [
+        "passed",
+        "seatedExactlyOnce",
+        "uniqueSeats",
+        "gateArrivalRespected",
+        "priorityStagesRespected",
+        "partiesAndAssistanceRespected"
+      ],
+      "additionalProperties": false
+    },
+    "Timing": {
+      "type": "object",
+      "properties": {
+        "passengerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unitId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seatNumber": {
+          "$ref": "#/$defs/Seat"
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "gateArrivalSeconds": {
+          "type": "number",
+          "description": "Actual relative seconds; may be negative"
+        },
+        "boardedAtSeconds": {
+          "type": "number",
+          "description": "Absolute position on relative simulation clock, seconds",
+          "minimum": 0
+        },
+        "rowArrivalSeconds": {
+          "type": "number",
+          "description": "Absolute position on relative simulation clock, seconds",
+          "minimum": 0
+        },
+        "seatedAtSeconds": {
+          "type": "number",
+          "description": "Absolute position on relative simulation clock, seconds",
+          "minimum": 0
+        },
+        "gateWaitSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "freeWalkingSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "aisleBlockingSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "assistanceSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "stowSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "seatInterferenceSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "seatingSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "rowServiceSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "inAisleSeconds": {
+          "type": "number",
+          "description": "Duration, seconds",
+          "minimum": 0
+        },
+        "seatInterferenceCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Already seated blockers, not number of affected passengers"
+        }
+      },
+      "required": [
+        "passengerId",
+        "unitId",
+        "seatNumber",
+        "stage",
+        "gateArrivalSeconds",
+        "boardedAtSeconds",
+        "rowArrivalSeconds",
+        "seatedAtSeconds",
+        "gateWaitSeconds",
+        "freeWalkingSeconds",
+        "aisleBlockingSeconds",
+        "assistanceSeconds",
+        "stowSeconds",
+        "seatInterferenceSeconds",
+        "seatingSeconds",
+        "rowServiceSeconds",
+        "inAisleSeconds",
+        "seatInterferenceCount"
+      ],
+      "additionalProperties": false
+    },
+    "Result": {
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "$ref": "#/$defs/Strategy"
+        },
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "seed": {
+          "$ref": "#/$defs/Seed"
+        },
+        "inputHash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "metrics": {
+          "$ref": "#/$defs/Metrics"
+        },
+        "passengerTimings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Timing"
+          }
+        },
+        "adaptiveVersion": {
+          "const": "passenger-aware-v2"
+        },
+        "policyProfileId": {
+          "const": "BF-SWISS-INSPIRED-V1"
+        },
+        "policyAdvisories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PolicyAdvisory"
+          }
+        },
+        "constraintViolations": {
+          "$ref": "#/$defs/Constraints"
+        },
+        "validation": {
+          "$ref": "#/$defs/ResultValidation"
+        }
+      },
+      "required": [
+        "strategy",
+        "dataKind",
+        "seed",
+        "inputHash",
+        "metrics",
+        "passengerTimings",
+        "constraintViolations",
+        "validation"
+      ],
+      "additionalProperties": false
+    },
+    "Comparison": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "seed": {
+          "$ref": "#/$defs/Seed"
+        },
+        "flightId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenarioName": {
+          "enum": [
+            "normal",
+            "security-delays",
+            "late-arrivals"
+          ]
+        },
+        "policyProfileId": {
+          "const": "BF-SWISS-INSPIRED-V1"
+        },
+        "policyNotice": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adaptiveVersion": {
+          "const": "passenger-aware-v2"
+        },
+        "inputHash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "metricNotes": {
+          "type": "object",
+          "properties": {
+            "totalBoardingSeconds": {
+              "type": "string",
+              "minLength": 1
+            },
+            "meanGateWaitSeconds": {
+              "type": "string",
+              "minLength": 1
+            },
+            "aisleBlockingPersonSeconds": {
+              "type": "string",
+              "minLength": 1
+            },
+            "aisleBlockingPersonMinutes": {
+              "type": "string",
+              "minLength": 1
+            },
+            "gateEntranceBlockedSeconds": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "totalBoardingSeconds",
+            "meanGateWaitSeconds",
+            "aisleBlockingPersonSeconds",
+            "aisleBlockingPersonMinutes",
+            "gateEntranceBlockedSeconds"
+          ],
+          "additionalProperties": false
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "strategy": {
+                "$ref": "#/$defs/Strategy"
+              },
+              "inputHash": {
+                "$ref": "#/$defs/Hash"
+              },
+              "metrics": {
+                "$ref": "#/$defs/Metrics"
+              },
+              "validation": {
+                "$ref": "#/$defs/ResultValidation"
+              },
+              "constraintViolations": {
+                "$ref": "#/$defs/Constraints"
+              }
+            },
+            "required": [
+              "strategy",
+              "inputHash",
+              "metrics",
+              "validation",
+              "constraintViolations"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "dataKind",
+        "seed",
+        "flightId",
+        "inputHash",
+        "metricNotes",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "TraceEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "stage_opened"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "stage": {
+              "$ref": "#/$defs/Stage"
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "stage"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "unit_called"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stage": {
+              "$ref": "#/$defs/Stage"
+            },
+            "assisted": {
+              "type": "boolean"
+            },
+            "memberIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "unitId",
+            "stage",
+            "assisted",
+            "memberIds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "boarded"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Entrance=0; row cells=1..N"
+            },
+            "seatNumber": {
+              "$ref": "#/$defs/Seat"
+            },
+            "stage": {
+              "$ref": "#/$defs/Stage"
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "cell",
+            "seatNumber",
+            "stage",
+            "unitId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "moved"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fromCell": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Entrance=0; row cells=1..N"
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "fromCell",
+            "cell"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "row_service_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Entrance=0; row cells=1..N"
+            },
+            "blockingSeats": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Seat"
+              }
+            },
+            "assistanceSeconds": {
+              "type": "number",
+              "description": "Actual service duration, seconds",
+              "minimum": 0
+            },
+            "stowSeconds": {
+              "type": "number",
+              "description": "Actual service duration, seconds",
+              "minimum": 0
+            },
+            "seatInterferenceSeconds": {
+              "type": "number",
+              "description": "Actual service duration, seconds",
+              "minimum": 0
+            },
+            "seatingSeconds": {
+              "type": "number",
+              "description": "Actual service duration, seconds",
+              "minimum": 0
+            },
+            "serviceEndSeconds": {
+              "type": "number",
+              "description": "Scheduled ACTUAL future service end; offline replay truth, forbidden in controller inputs",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "cell",
+            "blockingSeats",
+            "assistanceSeconds",
+            "stowSeconds",
+            "seatInterferenceSeconds",
+            "seatingSeconds",
+            "serviceEndSeconds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "assistance_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "durationSeconds": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "durationSeconds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "assistance_completed"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "stow_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pieces": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "pieces"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "stow_completed"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "seat_interference_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blockingSeats": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Seat"
+              }
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "blockingSeats"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "seat_interference_completed"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "seating_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "seated"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Entrance=0; row cells=1..N"
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "cell"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "aisle_block_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Entrance=0; row cells=1..N"
+            },
+            "blockedCell": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blockedByPassengerId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Occupant at start of blocked interval only"
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "cell",
+            "blockedCell",
+            "blockedByPassengerId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "aisle_block_ended"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Entrance=0; row cells=1..N"
+            },
+            "durationSeconds": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "cell",
+            "durationSeconds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "gate_entry_block_started"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blockedByPassengerId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "blockedByPassengerId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "gate_entry_block_ended"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "durationSeconds": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerId",
+            "durationSeconds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "escort_released"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "unitId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timeSeconds": {
+              "type": "number",
+              "description": "Relative seconds on the simulation grid",
+              "minimum": 0
+            },
+            "type": {
+              "const": "boarding_completed"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Emission ID; NOT playback order"
+            },
+            "eventIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Chronological playback order"
+            },
+            "passengerCount": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "timeSeconds",
+            "type",
+            "sequence",
+            "eventIndex",
+            "passengerCount"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TraceMetadata": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "engine": {
+          "const": "boardingflow-single-aisle-cells"
+        },
+        "timeUnit": {
+          "const": "seconds"
+        },
+        "tickSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "timeOrigin": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "seatLetters": {
+              "const": "ABCDEF"
+            },
+            "entranceCell": {
+              "const": 0
+            },
+            "cellCapacity": {
+              "const": 1
+            }
+          },
+          "required": [
+            "rows",
+            "seatLetters",
+            "entranceCell",
+            "cellCapacity"
+          ],
+          "additionalProperties": false
+        },
+        "ordering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "passengers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "passengerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seatNumber": {
+                "$ref": "#/$defs/Seat"
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unitId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "stage": {
+                "$ref": "#/$defs/Stage"
+              },
+              "walkStepSeconds": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "passengerId",
+              "seatNumber",
+              "row",
+              "unitId",
+              "stage",
+              "walkStepSeconds"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "engine",
+        "timeUnit",
+        "tickSeconds",
+        "timeOrigin",
+        "geometry",
+        "ordering",
+        "eventTypes",
+        "passengers"
+      ],
+      "additionalProperties": false
+    },
+    "TraceValidation": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "const": true
+        },
+        "traceSchemaVersion": {
+          "const": 1
+        },
+        "eventCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seatedExactlyOnce": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "collisionFree": {
+          "const": true
+        },
+        "movementTimingRespected": {
+          "const": true
+        },
+        "noUnexplainedAisleQueues": {
+          "const": true
+        },
+        "servicePhasesVerified": {
+          "const": true
+        },
+        "blockingIntervalsReconciled": {
+          "const": true
+        },
+        "constraints": {
+          "$ref": "#/$defs/Constraints"
+        },
+        "metrics": {
+          "$ref": "#/$defs/Metrics"
+        }
+      },
+      "required": [
+        "passed",
+        "traceSchemaVersion",
+        "eventCount",
+        "seatedExactlyOnce",
+        "collisionFree",
+        "movementTimingRespected",
+        "noUnexplainedAisleQueues",
+        "servicePhasesVerified",
+        "blockingIntervalsReconciled",
+        "constraints",
+        "metrics"
+      ],
+      "additionalProperties": false
+    },
+    "TraceEnvelope": {
+      "type": "object",
+      "properties": {
+        "traceSchemaVersion": {
+          "const": 1
+        },
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "strategy": {
+          "$ref": "#/$defs/Strategy"
+        },
+        "inputHash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "metadata": {
+          "$ref": "#/$defs/TraceMetadata"
+        },
+        "metrics": {
+          "$ref": "#/$defs/Metrics"
+        },
+        "validation": {
+          "$ref": "#/$defs/TraceValidation"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TraceEvent"
+          }
+        }
+      },
+      "required": [
+        "traceSchemaVersion",
+        "dataKind",
+        "strategy",
+        "inputHash",
+        "metadata",
+        "metrics",
+        "validation",
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "Recommendation": {
+      "type": "object",
+      "properties": {
+        "timeSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "informationTimeSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "latestObservedAtSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "algorithmVersion": {
+          "const": "passenger-aware-v2"
+        },
+        "advisory": {
+          "const": true
+        },
+        "simulationOnly": {
+          "const": true
+        },
+        "requiresStaffApproval": {
+          "const": true
+        },
+        "requiresGateVerification": {
+          "const": true
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "action": {
+          "enum": [
+            "WAIT",
+            "RELEASE"
+          ]
+        },
+        "unitId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memberIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "plannedUnitId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "predictedReadyAtSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "releaseAtSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nextReviewSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plannedGateETASeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readinessUncertaintySeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readyUnitCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reasonText": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policyReason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "type": "number"
+        },
+        "scoreComponents": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "seatDepth": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                },
+                "knownSeatInterference": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                },
+                "baggage": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                },
+                "row": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                },
+                "zone": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                },
+                "congestion": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                },
+                "waiting": {
+                  "type": "number",
+                  "description": "Weighted heuristic score; not measured seconds"
+                }
+              },
+              "required": [
+                "seatDepth",
+                "knownSeatInterference",
+                "baggage",
+                "row",
+                "zone",
+                "congestion",
+                "waiting"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "expectedCompletion": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "inducedBlocking": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "pathCongestion": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "knownSeatInterference": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "seatAccess": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "baggageOverlap": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "rearCoverage": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "waiting": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                },
+                "readinessUncertainty": {
+                  "type": "number",
+                  "description": "Weighted expected-delay surrogate; not a measured duration"
+                }
+              },
+              "required": [
+                "expectedCompletion",
+                "inducedBlocking",
+                "pathCongestion",
+                "knownSeatInterference",
+                "seatAccess",
+                "baggageOverlap",
+                "rearCoverage",
+                "waiting",
+                "readinessUncertainty"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "projectedCompletionDelaySeconds": {
+          "type": "number"
+        },
+        "currentReadyScore": {
+          "type": "number"
+        },
+        "anticipatedScore": {
+          "type": "number"
+        },
+        "remainingAnticipationBudgetSeconds": {
+          "type": "number"
+        },
+        "staleETA": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "releaseInterval": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "notBeforeSeconds": {
+                  "type": "number"
+                },
+                "minimumDurationSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "forecastOnly": {
+                  "const": true
+                },
+                "actualEntryRequiresFreeAisleCell": {
+                  "const": true
+                }
+              },
+              "required": [
+                "notBeforeSeconds",
+                "minimumDurationSeconds",
+                "forecastOnly"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trigger": {
+          "enum": [
+            "PASSENGER_OBSERVATION",
+            "STAFF_OBSERVATION",
+            "CABIN_PROGRESS",
+            "STAGE_OR_REVIEW_TIMER"
+          ]
+        },
+        "executionAuthorization": {
+          "const": "NONE_ADVISORY_ONLY"
+        }
+      },
+      "required": [
+        "timeSeconds",
+        "informationTimeSeconds",
+        "action",
+        "unitId",
+        "memberIds",
+        "plannedUnitId",
+        "predictedReadyAtSeconds",
+        "releaseAtSeconds",
+        "nextReviewSeconds",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "algorithmVersion"
+            ],
+            "properties": {
+              "algorithmVersion": {}
+            }
+          },
+          "then": {
+            "required": [
+              "advisory",
+              "simulationOnly",
+              "requiresStaffApproval",
+              "requiresGateVerification",
+              "reasonText"
+            ],
+            "properties": {
+              "advisory": {
+                "const": true
+              },
+              "simulationOnly": {
+                "const": true
+              },
+              "requiresStaffApproval": {
+                "const": true
+              },
+              "requiresGateVerification": {
+                "const": true
+              },
+              "reasonText": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "RecommendationEnvelope": {
+      "type": "object",
+      "properties": {
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "strategy": {
+          "const": "adaptive"
+        },
+        "inputHash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Recommendation"
+          }
+        }
+      },
+      "required": [
+        "dataKind",
+        "strategy",
+        "inputHash",
+        "recommendations"
+      ],
+      "additionalProperties": false
+    },
+    "ETAEvaluation": {
+      "type": "object",
+      "properties": {
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "scenarioName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "errorConvention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertaintyNote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "asOfSeconds": {
+                "type": "number"
+              },
+              "predictedCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "observedAtGate": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unavailablePredictions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "meanAbsoluteErrorSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "meanSignedErrorSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxAbsoluteErrorSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "p90AbsoluteErrorSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rootMeanSquaredErrorSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "asOfSeconds",
+              "predictedCount",
+              "observedAtGate",
+              "unavailablePredictions",
+              "meanAbsoluteErrorSeconds",
+              "meanSignedErrorSeconds",
+              "maxAbsoluteErrorSeconds",
+              "p90AbsoluteErrorSeconds",
+              "rootMeanSquaredErrorSeconds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "passengerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "asOfSeconds": {
+                "type": "number"
+              },
+              "predictedGateArrivalSeconds": {
+                "type": "number"
+              },
+              "actualGateArrivalSeconds": {
+                "type": "number"
+              },
+              "errorSeconds": {
+                "type": "number"
+              },
+              "absoluteErrorSeconds": {
+                "type": "number"
+              },
+              "predictionBasis": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observationAgeSeconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "overdue": {
+                "type": "boolean"
+              },
+              "securityOverdue": {
+                "type": "boolean"
+              },
+              "securityStatus": {
+                "enum": [
+                  "NOT_OBSERVED",
+                  "SCREENING",
+                  "CLEARED"
+                ]
+              },
+              "lastCheckpoint": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "passengerId",
+              "asOfSeconds",
+              "predictedGateArrivalSeconds",
+              "actualGateArrivalSeconds",
+              "errorSeconds",
+              "absoluteErrorSeconds",
+              "predictionBasis",
+              "observationAgeSeconds",
+              "overdue",
+              "securityOverdue",
+              "securityStatus",
+              "lastCheckpoint"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "dataKind",
+        "scenarioName",
+        "errorConvention",
+        "uncertaintyNote",
+        "summaries",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "SampleSummary": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean": {
+          "type": "number"
+        },
+        "sampleSD": {
+          "anyOf": [
+            {
+              "type": "number",
+              "description": "Sample SD, n-1; null for n=1",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "count",
+        "mean",
+        "sampleSD",
+        "min",
+        "max"
+      ],
+      "additionalProperties": false
+    },
+    "Statistics": {
+      "type": "object",
+      "properties": {
+        "totalBoardingSeconds": {
+          "$ref": "#/$defs/SampleSummary"
+        },
+        "meanGateWaitSeconds": {
+          "$ref": "#/$defs/SampleSummary"
+        },
+        "aisleBlockingPersonMinutes": {
+          "$ref": "#/$defs/SampleSummary"
+        },
+        "seatInterferencePersonSeconds": {
+          "$ref": "#/$defs/SampleSummary"
+        },
+        "seatInterferenceCount": {
+          "$ref": "#/$defs/SampleSummary"
+        },
+        "constraintViolationCount": {
+          "$ref": "#/$defs/SampleSummary"
+        }
+      },
+      "required": [
+        "totalBoardingSeconds",
+        "meanGateWaitSeconds",
+        "aisleBlockingPersonMinutes",
+        "seatInterferencePersonSeconds",
+        "seatInterferenceCount",
+        "constraintViolationCount"
+      ],
+      "additionalProperties": false
+    },
+    "Diagnostics": {
+      "type": "object",
+      "properties": {
+        "stages": {
+          "type": "object",
+          "properties": {
+            "PREBOARD": {
+              "type": "object",
+              "properties": {
+                "passengerCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "firstEntrySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lastEntrySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lastSeatedSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "blockingPersonSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "interferencePersonSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "passengerCount",
+                "firstEntrySeconds",
+                "lastEntrySeconds",
+                "lastSeatedSeconds",
+                "blockingPersonSeconds",
+                "interferencePersonSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "PRIORITY": {
+              "type": "object",
+              "properties": {
+                "passengerCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "firstEntrySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lastEntrySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lastSeatedSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "blockingPersonSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "interferencePersonSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "passengerCount",
+                "firstEntrySeconds",
+                "lastEntrySeconds",
+                "lastSeatedSeconds",
+                "blockingPersonSeconds",
+                "interferencePersonSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "GENERAL": {
+              "type": "object",
+              "properties": {
+                "passengerCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "firstEntrySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lastEntrySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lastSeatedSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "blockingPersonSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "interferencePersonSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "passengerCount",
+                "firstEntrySeconds",
+                "lastEntrySeconds",
+                "lastSeatedSeconds",
+                "blockingPersonSeconds",
+                "interferencePersonSeconds"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "reasons": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "waitReviewSpanSeconds": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "count",
+              "waitReviewSpanSeconds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "lastEntryToCompletionSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "policyHoldCounts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "stages",
+        "reasons",
+        "lastEntryToCompletionSeconds",
+        "policyHoldCounts",
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "Benchmark": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "comparisonType": {
+          "const": "STAGE6_POLICY_ENABLED"
+        },
+        "seeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Seed"
+          }
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Strategy"
+          }
+        },
+        "adaptiveVersion": {
+          "const": "passenger-aware-v2"
+        },
+        "adaptiveSettings": {
+          "$ref": "#/$defs/AdaptiveSettings"
+        },
+        "beforeVersion": {
+          "const": "legacy-v1"
+        },
+        "preservedBeforeSnapshotVerified": {
+          "type": "boolean"
+        },
+        "runtimeSourceHashes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Hash"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "experiments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scenario": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seed": {
+                "$ref": "#/$defs/Seed"
+              },
+              "passengerCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inputHash": {
+                "$ref": "#/$defs/Hash"
+              },
+              "passengerProfileHash": {
+                "$ref": "#/$defs/Hash"
+              },
+              "simulatorHash": {
+                "$ref": "#/$defs/Hash"
+              },
+              "actualScenarioHash": {
+                "$ref": "#/$defs/Hash"
+              },
+              "policyHash": {
+                "$ref": "#/$defs/Hash"
+              },
+              "beforeAdaptive": {
+                "type": "object",
+                "properties": {
+                  "metrics": {
+                    "$ref": "#/$defs/Metrics"
+                  },
+                  "diagnostics": {
+                    "$ref": "#/$defs/Diagnostics"
+                  }
+                },
+                "required": [
+                  "metrics",
+                  "diagnostics"
+                ],
+                "additionalProperties": false
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "$ref": "#/$defs/Strategy"
+                    },
+                    "inputHash": {
+                      "$ref": "#/$defs/Hash"
+                    },
+                    "metrics": {
+                      "$ref": "#/$defs/Metrics"
+                    },
+                    "validation": {
+                      "$ref": "#/$defs/ResultValidation"
+                    },
+                    "constraintViolations": {
+                      "$ref": "#/$defs/Constraints"
+                    }
+                  },
+                  "required": [
+                    "strategy",
+                    "inputHash",
+                    "metrics",
+                    "validation",
+                    "constraintViolations"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "adaptiveDiagnostics": {
+                "$ref": "#/$defs/Diagnostics"
+              }
+            },
+            "required": [
+              "scenario",
+              "seed",
+              "passengerCount",
+              "inputHash",
+              "passengerProfileHash",
+              "simulatorHash",
+              "actualScenarioHash",
+              "policyHash",
+              "beforeAdaptive",
+              "results",
+              "adaptiveDiagnostics"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "summaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scenario": {
+                "type": "string",
+                "minLength": 1
+              },
+              "strategies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "$ref": "#/$defs/Strategy"
+                    },
+                    "metrics": {
+                      "$ref": "#/$defs/Statistics"
+                    }
+                  },
+                  "required": [
+                    "strategy",
+                    "metrics"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "paired": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "$ref": "#/$defs/Strategy"
+                    },
+                    "reference": {
+                      "$ref": "#/$defs/Strategy"
+                    },
+                    "wins": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "ties": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "losses": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "completionDelta": {
+                      "$ref": "#/$defs/SampleSummary"
+                    },
+                    "deltas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "seed": {
+                            "$ref": "#/$defs/Seed"
+                          },
+                          "completionSeconds": {
+                            "type": "number",
+                            "description": "Subject minus reference; positive is worse"
+                          },
+                          "meanGateWaitSeconds": {
+                            "type": "number",
+                            "description": "Subject minus reference; positive is worse"
+                          },
+                          "blockingPersonMinutes": {
+                            "type": "number",
+                            "description": "Subject minus reference; positive is worse"
+                          }
+                        },
+                        "required": [
+                          "seed",
+                          "completionSeconds",
+                          "meanGateWaitSeconds",
+                          "blockingPersonMinutes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "strategy",
+                    "reference",
+                    "wins",
+                    "ties",
+                    "losses",
+                    "completionDelta",
+                    "deltas"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "beforeAfter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "seed": {
+                      "$ref": "#/$defs/Seed"
+                    },
+                    "beforeSeconds": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "afterSeconds": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "seed",
+                    "beforeSeconds",
+                    "afterSeconds"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "adaptiveChangeSeconds": {
+                "$ref": "#/$defs/SampleSummary"
+              }
+            },
+            "required": [
+              "scenario",
+              "strategies",
+              "paired",
+              "beforeAfter",
+              "adaptiveChangeSeconds"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "dataKind",
+        "comparisonType",
+        "seeds",
+        "cases",
+        "strategies",
+        "adaptiveVersion",
+        "adaptiveSettings",
+        "beforeVersion",
+        "preservedBeforeSnapshotVerified",
+        "runtimeSourceHashes",
+        "notes",
+        "experiments",
+        "summaries"
+      ],
+      "additionalProperties": false
+    },
+    "ExampleIndex": {
+      "type": "object",
+      "properties": {
+        "exampleBundleVersion": {
+          "const": 1
+        },
+        "dataKind": {
+          "const": "SYNTHETIC"
+        },
+        "baselineReferenceCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "seed": {
+          "$ref": "#/$defs/Seed"
+        },
+        "scenarioName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passengerCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inputHash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Strategy"
+          }
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Hash"
+          }
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "exampleBundleVersion",
+        "dataKind",
+        "baselineReferenceCommit",
+        "seed",
+        "scenarioName",
+        "passengerCount",
+        "inputHash",
+        "strategies",
+        "files",
+        "note"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

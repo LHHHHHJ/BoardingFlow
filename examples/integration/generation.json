@@ -1,0 +1,9 @@
+{
+  "aircraft": { "rows": 3 },
+  "generation": {
+    "partyProbability": 0.25,
+    "priorityProbability": 0,
+    "additionalPreboardingProbability": 0,
+    "assistanceProbability": 0.06
+  }
+}

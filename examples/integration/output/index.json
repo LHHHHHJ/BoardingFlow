@@ -1,0 +1,37 @@
+{
+  "exampleBundleVersion": 1,
+  "dataKind": "SYNTHETIC",
+  "baselineReferenceCommit": "7e081741979b193ddfc6bbd8ce4dd17948b91381",
+  "seed": 42,
+  "scenarioName": "normal",
+  "passengerCount": 18,
+  "inputHash": "c9d732a3610cda9e2c18f9278c6e8fbd5416a25cb64412acc707d6f19a5b6e4a",
+  "strategies": [
+    "random",
+    "zone",
+    "baggage-aware",
+    "wilma",
+    "adaptive"
+  ],
+  "files": {
+    "manifest.json": "88717d074188387073d0fc07c71baa1855066b3fa6422ad969650972a9804fad",
+    "comparison.json": "5afe8c3e2ec1b1a7fd8132bdd12d3ea2a7535052e00b22a59789951d5f386e6b",
+    "readiness-0.json": "8f5d5b4e2e0ebf7ff50bdf772a1a1814e784a98c1b93f02ee7571ae10fe98a96",
+    "readiness-early.json": "4077f602edbf8d9c16277c6435dc7f5ba1f5736b3eec3c2c0f8ace446af291a6",
+    "recommendations-adaptive.json": "5a61ad908cf8b2dae778b3b3ec33e8d135eec305ad3ddcd9d21aeefc7fa748ab",
+    "policy-preview.json": "6d9b54d180fd77fc714d01cb4f5542bec8d1862ee30dd038087a936de042ace5",
+    "eta-evaluation.json": "6ced39262c287b26418f2cf9de44224bca0e963313dc9503b15aa37cdfe92b42",
+    "events-random.json": "bb89850361f1b44bdc0b03fad0a7d7281024e4217bb168714fd0826c92e879f1",
+    "timings-random.json": "e0c5c7517317d34f0d55e30e48a4f331a8e2160be720d89df539e735f033e150",
+    "events-zone.json": "dc86e342847fbb9680cc7ffee856906514acd76ab5704eff88b0a9c2ceccd2e8",
+    "timings-zone.json": "a5ffaba9f5534f07da61e86c0eff594a06d1d7ce750504c1d1c0b568c48f523e",
+    "events-baggage-aware.json": "1c3ab1f0c65164432bc64d5fbdf320b19fe4e7abe3ffb9c062e9bc89e096a896",
+    "timings-baggage-aware.json": "66cdeb119dd418f862a248c5ef320aa861d5a52dc9f2a5b99a0a2eb12b3ca113",
+    "events-wilma.json": "ca4d572c07cccf63dfc649bb9c10a386efda5ecac9da9e478760032cfc7055dc",
+    "timings-wilma.json": "97d809ca410dcf36a2e8deccb6c89768117afc33ac41bc396e93e93c635d9788",
+    "events-adaptive.json": "7ebec9efd06197a0494934325ca7d81d65cdd5fca2c570e89ad7b1f65049ae83",
+    "timings-adaptive.json": "9eaa3d2a0d1c00b4c421a2d4cbc23da1cd0b5b48ab450840a0c2f4e9783d9941",
+    "benchmark.json": "9ddd6fa9315b7ba5f55e37e922ce48ec268be82a892de1d00c720a71a75d1628"
+  },
+  "note": "Three-row integration fixture, not the 180-passenger benchmark. CLI-produced payloads; only whitespace is compacted. No real airport authorization or measurements."
+}

@@ -1,0 +1,1 @@
+{"timeSeconds":0,"advisory":true,"simulationOnly":true,"requiresStaffApproval":true,"requiresGateVerification":true,"action":"RECOMMEND_BOARDING","unitId":"policy:[\"SYN-P016\",\"SYN-P017\",\"SYN-P018\"]","memberIds":["SYN-P018","SYN-P017","SYN-P016"],"simulationAdmissionAllowed":true,"reason":"SAFE_READY_UNIT_FALLBACK","profileId":"BF-SWISS-INSPIRED-V1"}
