@@ -1,6 +1,6 @@
 import { deepFreeze, manifestHash, validateManifest } from './model.js';
 import { simulate } from './simulate.js';
-import { STRATEGIES } from './strategies.js';
+import { STRATEGIES, STAGE6_STRATEGIES } from './strategies.js';
 
 export function compareStrategies(manifest, options = {}) {
   return compareWith(manifest, STRATEGIES, options);
@@ -9,6 +9,11 @@ export function compareStrategies(manifest, options = {}) {
 // Explicitly retain the three original baselines for future adaptive comparisons.
 export function compareBaselines(manifest, options = {}) {
   return compareWith(manifest, STRATEGIES, options);
+}
+
+export function compareAllStrategies(manifest, options = {}) {
+  if (!manifest.boardingPolicy || !manifest.phase2) throw new Error('Five-strategy comparison requires observed readiness and the explicit policy');
+  return compareWith(manifest, STAGE6_STRATEGIES, options);
 }
 
 function compareWith(manifest, strategies, options) {

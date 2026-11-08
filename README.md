@@ -80,6 +80,24 @@ The example is specific to the default seed-42 passenger IDs. Its staff confirma
 
 No age, senior or pet label grants rights or changes walking speed. Family eligibility and assistance use explicit confirmed arrangements; no diagnosis data is requested. See [the seven-item Stage 5 audit, configuration contract and actual results](docs/STAGE5_AUDIT.md). The adaptive scoring module is unchanged; this stage adds shared rights checks and safety gates only.
 
+## Stage 6 Passenger-Aware Adaptive BoardingFlow and independent WilMA
+
+`compare-all` compares **random, zone, baggage-aware, wilma and adaptive** on one frozen policy-enabled manifest. WilMA sorts general required groups by mean seat depth (window 0, middle 1, aisle 2), then the shared seeded lottery; protected stages and intact families/parties take precedence. The new Adaptive version uses observed readiness/staff confirmations, expected service work and visible aisle progress. The original controller remains available as `legacy-v1`.
+
+```powershell
+node src/cli.js stage6 --seeds 0,1,2,3,4,5,6,7,8,9,42 --adaptive-config config/stage6.example.json --output results/stage6/after
+node src/cli.js compare-all --input results/stage6/after/normal/seed-42/manifest.json --output results/stage6/single --trace
+node src/cli.js simulate --input results/stage6/after/normal/seed-42/manifest.json --strategy adaptive --adaptive-version legacy-v1 --output results/stage6/legacy-replay
+node --test test/stage6.test.js
+node --test
+```
+
+The fixed Stage 6 suite covers 33 scenarios/165 strategy runs and 33 paired legacy-Adaptive replays. It explicitly uses synthetic confirmed First/elite/family arrangements from the Stage 5 example and confirms the requested assistance per seed; no rights are inferred from age or pets. It produces per-seed CSV/JSON, mean/sample SD, paired losses and before/after diagnostics. Use `--before-dir results/stage6/before` to verify/reuse this workspace's preserved immutable pre-change snapshots; omit it to regenerate and replay the retained legacy version on a fresh checkout. The before directory is protected against output overwrite.
+
+Adaptive defaults to `passenger-aware-v2` on explicit policy inputs; earlier Phase 2 inputs without a policy keep legacy behavior. Existing `compare` and `baselines` strategy selections are preserved. Historical Stage 3/4 reports stay separate from these new policy-enabled experiments. Confirmed pet/service-animal records require explicit operational arrangements and grant no automatic priority or speed penalty.
+
+See [the six-item Stage 6 audit and information boundary](docs/STAGE6_AUDIT.md) and [actual multi-seed results, before/after investigation and losses](docs/STAGE6_RESULTS.md). No dashboard, ML, Stage 7 expansion or submission work is included.
+
 ## Run everything
 
 From the parent workspace in PowerShell:
@@ -145,6 +163,9 @@ BoardingFlow/
     strategies.js            Shared party/stage rules and strategy ordering
     simulate.js              Spatial simulation and result invariant audit
     trace.js                 Versioned trace contract and independent replay validator
+    adaptive.js              Preserved legacy Adaptive controller and replay
+    adaptive-v2.js           Policy-enabled observation-only expected-delay controller
+    stage6-benchmark.js      Fixed five-strategy suite and paired legacy replay
     constraints.js           Shared post-run core boarding constraint checks
     compare.js               Immutable shared-input comparison
     io.js                    JSON/CSV exports and CLI result formatting
@@ -166,13 +187,15 @@ BoardingFlow/
 
 The aircraft has an entrance cell and one aisle cell per row. Each cell holds at most one passenger. Passengers cannot pass; they wait when the next cell is occupied. At their row, assistance, luggage stowing, seat interference and seating keep that cell occupied. Other unblocked rows continue processing at the same time. This is a spatial, discrete-time simulation, rather than a sum of individual processing times.
 
-All strategies use the same preboarding and priority lottery. Differences apply to general boarding:
+All strategies use the same preboarding and priority lottery. Differences apply to general boarding. The existing compare and baselines commands retain their three-strategy selection; Stage 6 uses compare-all for all five:
 
 | Strategy | General boarding order |
 | --- | --- |
 | `random` | Seeded shuffle of travel parties and solo passengers |
 | `zone` | Rear, middle, front; seeded shuffle within each zone |
 | `baggage-aware` | Window-oriented parties first, then more expected baggage work; row parity and rear-first order break ties |
+| `wilma` | Window, middle, aisle; mean seat depth for intact mixed parties and the shared seeded lottery for ties |
+| `adaptive` | Policy-enabled v2 scores expected delay from confirmed readiness and visible cabin progress; no speculative wait over a feasible ready group. Retained `legacy-v1` uses the original bounded ETA lookahead. |
 
 All parties board consecutively and wait until every member has reached the gate. A party uses its earliest member entitlement, keeping companions together. All preboarding passengers must be seated before priority boarding; all priority passengers must enter before general boarding. Assisted parties reserve an empty aisle and escort until the entire party is seated. Late protected passengers hold their stage. Zone calls also wait for the previous zone's admissions to finish. These conservative, synthetic policies are common across the comparison; details and limitations are in [MODEL.md](docs/MODEL.md).
 

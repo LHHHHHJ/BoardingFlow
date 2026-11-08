@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { STRATEGIES } from './strategies.js';
+import { SUPPORTED_STRATEGIES } from './strategies.js';
+import { createReadinessObserver, evaluateGateETA } from './readiness.js';
 import { createTraceEnvelope } from './trace.js';
 
 export async function readJSON(path) {
@@ -88,13 +89,17 @@ export function resultTable(results) {
 export async function writeArtifacts(directory, manifest, results) {
   await mkdir(directory, { recursive: true });
   // Clear only known generated artifacts that would otherwise describe an old run.
-  for (const strategy of STRATEGIES) {
+  for (const strategy of SUPPORTED_STRATEGIES) {
     const result = results.find(item => item.strategy === strategy);
     if (!result) {
       await rm(join(directory, `timings-${strategy}.json`), { force: true });
       await rm(join(directory, `timings-${strategy}.csv`), { force: true });
     }
     if (!result?.events) await rm(join(directory, `events-${strategy}.json`), { force: true });
+    if (!result?.recommendations) await rm(join(directory, `recommendations-${strategy}.json`), { force: true });
+  }
+  if (!manifest.phase2) {
+    for (const file of ['readiness-0.json', 'eta-evaluation.json', 'eta-evaluation.csv']) await rm(join(directory, file), { force: true });
   }
   await writeJSON(join(directory, 'manifest.json'), manifest);
   await writeFile(join(directory, 'passengers.csv'), csv(passengerRows(manifest)), 'utf8');
@@ -103,8 +108,10 @@ export async function writeArtifacts(directory, manifest, results) {
     dataKind: 'SYNTHETIC',
     seed: manifest.seed,
     flightId: manifest.flight.flightId,
+    ...(manifest.phase2 ? { scenarioName: manifest.phase2.scenarioName } : {}),
     ...(manifest.boardingPolicy ? { policyProfileId: manifest.boardingPolicy.profileId,
       policyNotice: 'SYNTHETIC advisory simulation; staff approval, observed clearance and gate verification are required for admission.' } : {}),
+    ...(results.some(r => r.adaptiveVersion) ? { adaptiveVersion: results.find(r => r.adaptiveVersion).adaptiveVersion } : {}),
     inputHash: results[0]?.inputHash,
     metricNotes: {
       totalBoardingSeconds: 'Elapsed from boarding opening (t=0) until last seating; includes idle periods.',
@@ -118,10 +125,19 @@ export async function writeArtifacts(directory, manifest, results) {
   await writeJSON(join(directory, 'comparison.json'), comparison);
   await writeFile(join(directory, 'comparison.csv'), csv(results.map(result => ({ strategy: result.strategy, inputHash: result.inputHash, ...result.metrics }))), 'utf8');
   for (const result of results) {
-    const { events, traceMetadata, traceValidation, ...timingResult } = result;
+    const { events, recommendations, traceMetadata, traceValidation, ...timingResult } = result;
     await writeJSON(join(directory, `timings-${result.strategy}.json`), timingResult);
     await writeFile(join(directory, `timings-${result.strategy}.csv`), csv(result.passengerTimings), 'utf8');
     if (events) await writeJSON(join(directory, `events-${result.strategy}.json`), createTraceEnvelope(manifest, result));
+    if (recommendations) await writeJSON(join(directory, `recommendations-${result.strategy}.json`), {
+      dataKind: 'SYNTHETIC', strategy: result.strategy, inputHash: result.inputHash, recommendations
+    });
+  }
+  if (manifest.phase2) {
+    await writeJSON(join(directory, 'readiness-0.json'), createReadinessObserver(manifest).snapshot(0));
+    const evaluation = evaluateGateETA(manifest);
+    await writeJSON(join(directory, 'eta-evaluation.json'), evaluation);
+    await writeFile(join(directory, 'eta-evaluation.csv'), csv(evaluation.rows), 'utf8');
   }
   await writeFile(join(directory, 'report.txt'), [
     `BoardingFlow | SYNTHETIC | seed ${manifest.seed} | ${manifest.passengers.length} passengers`,

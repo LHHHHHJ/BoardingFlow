@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { compareStrategies } from './compare.js';
+import { compareStrategies, compareAllStrategies } from './compare.js';
 import { generateFlight } from './generate.js';
 import { deepFreeze, validateManifest } from './model.js';
 import { csv, readJSON, resultTable, writeArtifacts, writeJSON } from './io.js';
@@ -12,6 +12,7 @@ import { auditTerminal } from './terminal.js';
 import { withBoardingPolicy } from './policy-scenario.js';
 import { createPolicyObserver, reviewBoardingRecommendation } from './policy.js';
 import { orderUnits } from './strategies.js';
+import { runStage6Benchmark } from './stage6-benchmark.js';
 import { auditPassengerDataset } from './dataset-audit.js';
 import { validateSimulationTrace } from './trace.js';
 import { runBaselineBenchmark, writeBaselineBenchmark } from './baseline-benchmark.js';
@@ -36,13 +37,17 @@ Run from the BoardingFlow folder. No install step or external packages required.
 
   node src/cli.js apply-policy --input data/normal.json --policy-config config/stage5.example.json --output data/stage5.json
   node src/cli.js policy-preview --input data/stage5.json --at 0 --strategy zone --output results/stage5/advisory.json
+  node src/cli.js compare-all --input data/stage5.json --output results/stage6/single --trace
+  node src/cli.js stage6 --seeds 0,1,2,3,4,5,6,7,8,9,42 --output results/stage6/after
 
 generate/demo: optional --config config/example.json (partial assumption overrides).
 Stage 1 mix/group example: --config config/stage1.example.json.
 audit-dataset: reports class/mix/group sizes and allowance vs actual carry-on;
   exits 1 if the 180-passenger Stage 1 checklist is incomplete, while saving the report.
 generate: optional --scenario normal | security-delays | late-arrivals; --phase2-config config/stage4.example.json requires --scenario.
-simulate: --strategy random | zone | baggage-aware (default random).
+simulate: --strategy random | zone | baggage-aware | wilma | adaptive (default random).
+  Adaptive with an explicit policy defaults to passenger-aware-v2; --adaptive-version legacy-v1 replays the original controller.
+  Optional --adaptive-config config/stage6.example.json changes v2 expectations, not aircraft physics.
 baselines: always random/zone/baggage-aware; synthetic Phase 1 arrival stress cases.
   Optional --seeds comma-separated uint32s, --cases normal,all-at-gate,late-arrivals,
   --config partial generation/simulator overrides; case arrival overrides take precedence.
@@ -52,6 +57,11 @@ eta-evaluate: post-run forecast errors; optional --times comma-separated finite 
   Writes eta-evaluation.json/.csv and eta-summary.csv into --output directory.
 apply-policy: explicit Stage 5 profile; example staff events are SYNTHETIC confirmations only.
 policy-preview: advisory with staff/gate checks; assumes no previous aircraft admissions.
+compare-all: random/zone/baggage-aware/wilma/adaptive on one frozen policy-enabled manifest.
+stage6: fixed policy-enabled five-strategy experiment and paired old/new Adaptive runs.
+  Optional --cases normal,security-delays,late-arrivals; --config generation overrides;
+  --policy-config explicit policy fixture; --adaptive-config v2 settings;
+  --before-dir results/stage6/before reuses and verifies the preserved frozen inputs.
 simulate/compare: reuse the complete config and passenger behavior stored in the input.
 --trace writes cell movement and row service events; --help prints this message.
 node --test runs the automated checks.
@@ -65,7 +75,9 @@ function parseArguments(argv) {
     validate: ['input'],
     'audit-dataset': ['input', 'output'],
     'validate-trace': ['input', 'trace-file', 'output'],
-    simulate: ['input', 'strategy', 'output', 'trace'],
+    simulate: ['input', 'strategy', 'output', 'trace', 'adaptive-version', 'adaptive-config'],
+    'compare-all': ['input', 'output', 'trace', 'adaptive-config'],
+    stage6: ['seeds', 'cases', 'config', 'policy-config', 'adaptive-config', 'before-dir', 'output', 'trace'],
     compare: ['input', 'output', 'trace'],
     readiness: ['input', 'at', 'output'],
     'terminal-audit': ['input', 'output'],
@@ -89,7 +101,7 @@ function parseArguments(argv) {
       options[key] = value;
     }
   }
-  if (['validate', 'simulate', 'compare', 'audit-dataset', 'validate-trace', 'readiness', 'terminal-audit', 'eta-evaluate', 'apply-policy', 'policy-preview'].includes(command) && !options.input) throw new Error(`${command} requires --input`);
+  if (['validate', 'simulate', 'compare', 'compare-all', 'audit-dataset', 'validate-trace', 'readiness', 'terminal-audit', 'eta-evaluate', 'apply-policy', 'policy-preview'].includes(command) && !options.input) throw new Error(`${command} requires --input`);
   if (command === 'apply-policy' && !options['policy-config']) throw new Error('apply-policy requires --policy-config');
   if (command === 'validate-trace' && !options['trace-file']) throw new Error('validate-trace requires --trace-file');
   if (options.seed !== undefined && !/^\d+$/.test(options.seed)) throw new Error('seed must be uint32');
@@ -100,6 +112,25 @@ function parseArguments(argv) {
 async function main() {
   const { help, command, options } = parseArguments(process.argv.slice(2));
   if (help) { console.log(HELP); return; }
+  if (command === 'stage6') {
+    if (options.seeds !== undefined && !/^\d+(,\d+)*$/.test(options.seeds)) throw new Error('seeds must be comma-separated uint32 integers');
+    const output = resolve(options.output ?? 'results/stage6/after');
+    const report = await runStage6Benchmark({
+      ...(options.seeds ? { seeds: options.seeds.split(',').map(Number) } : {}),
+      ...(options.cases ? { cases: options.cases.split(',') } : {}),
+      generation: options.config ? await readJSON(options.config) : {},
+      policyConfiguration: options['policy-config'] ? await readJSON(options['policy-config']) : null,
+      adaptiveSettings: options['adaptive-config'] ? await readJSON(options['adaptive-config']) : {},
+      beforeDirectory: options['before-dir'] ?? null, trace: !!options.trace, output
+    });
+    for (const summary of report.summaries) {
+      console.log(`${summary.scenario}: mean completion seconds (sample SD)`);
+      for (const row of summary.strategies) console.log(`  ${row.strategy}: ${row.metrics.totalBoardingSeconds.mean.toFixed(2)} (${row.metrics.totalBoardingSeconds.sampleSD?.toFixed(2) ?? 'n/a'})`);
+      console.log(`  Adaptive mean after-minus-before: ${summary.adaptiveChangeSeconds.mean.toFixed(2)}s`);
+    }
+    console.log(`PASS: ${report.experiments.length * 5} strategy runs + ${report.experiments.length} legacy Adaptive replays; zero violations. Saved: ${output}`);
+    return;
+  }
   if (command === 'baselines') {
     if (options.seeds !== undefined && !/^\d+(,\d+)*$/.test(options.seeds)) throw new Error('seeds must be comma-separated uint32 integers');
     const benchmark = runBaselineBenchmark({
@@ -219,9 +250,12 @@ async function main() {
     return;
   }
   deepFreeze(manifest);
+  const adaptiveOptions = { adaptiveSettings: options['adaptive-config'] ? await readJSON(options['adaptive-config']) : {},
+    ...(options['adaptive-version'] ? { adaptiveVersion: options['adaptive-version'] } : {}) };
   const results = command === 'simulate'
-    ? [simulate(manifest, options.strategy ?? 'random', { trace: !!options.trace })]
-    : compareStrategies(manifest, { trace: !!options.trace }).results;
+    ? [simulate(manifest, options.strategy ?? 'random', { trace: !!options.trace, ...adaptiveOptions })]
+    : command === 'compare-all' ? compareAllStrategies(manifest, { trace: !!options.trace, ...adaptiveOptions }).results
+      : compareStrategies(manifest, { trace: !!options.trace }).results;
   const directory = resolve(options.output ?? 'results');
   await writeArtifacts(directory, manifest, results);
   console.log(`\n${resultTable(results)}\n`);

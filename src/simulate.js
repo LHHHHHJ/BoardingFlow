@@ -2,6 +2,8 @@ import { blockingSeats, manifestHash, parseSeat, STAGE_NAMES, validateManifest }
 import { boardingUnits, orderUnits, readyUnit } from './strategies.js';
 import { validateScenario } from './scenarios.js';
 import { createReadinessObserver } from './readiness.js';
+import { createAdaptiveController } from './adaptive.js';
+import { createPassengerAwareController, ADAPTIVE_VERSION } from './adaptive-v2.js';
 import { createPolicyObserver, reviewBoardingRecommendation } from './policy.js';
 import { constraintReport } from './constraints.js';
 import { createTraceMetadata, validateSimulationTrace } from './trace.js';
@@ -9,14 +11,25 @@ import { createTraceMetadata, validateSimulationTrace } from './trace.js';
 const clean = value => Math.round(value * 1_000_000) / 1_000_000;
 const sum = (items, key) => clean(items.reduce((total, item) => total + item[key], 0));
 
-export function simulate(manifest, strategy, { trace = false, requireFullFlight = true } = {}) {
+export function simulate(manifest, strategy, { trace = false, requireFullFlight = true, adaptiveVersion = null, adaptiveSettings = {} } = {}) {
   validateManifest(manifest, { requireFullFlight });
   if (manifest.phase2) validateScenario(manifest, { requireFullFlight });
   if (manifest.boardingPolicy?.status === 'UNVERIFIED') throw new Error('Policy unverified: staff review required before simulated boarding');
+  if (strategy === 'adaptive' && !manifest.phase2) throw new Error('Adaptive boarding requires a Phase 2 scenario; generate with --scenario normal');
   const pending = orderUnits(manifest, strategy);
   const observer = manifest.phase2 ? createReadinessObserver(manifest) : null;
   const policyObserver = manifest.boardingPolicy ? createPolicyObserver(manifest.boardingPolicy, manifest.passengers) : null;
   const policyAdvisories = [];
+  const selectedVersion = adaptiveVersion ?? (manifest.boardingPolicy ? ADAPTIVE_VERSION : 'legacy-v1');
+  if (strategy === 'adaptive' && ![ADAPTIVE_VERSION, 'legacy-v1'].includes(selectedVersion)) throw new Error('Unknown adaptive controller version');
+  const passengerAware = strategy === 'adaptive' && selectedVersion === ADAPTIVE_VERSION;
+  if (passengerAware && !manifest.boardingPolicy) throw new Error('Passenger-aware Adaptive requires an explicit confirmed policy');
+  const adaptive = strategy === 'adaptive' ? (passengerAware
+    ? createPassengerAwareController(manifest.phase2.settings.adaptive, adaptiveSettings)
+    : createAdaptiveController(manifest.phase2.settings.adaptive)) : null;
+  const recommendations = [];
+  let lastRecommendation = null;
+  let lastCabinSignature = null;
   const { simulation: config, aircraft } = manifest.config;
   const dt = config.tickSeconds;
   const ticks = seconds => Math.ceil(seconds / dt - 1e-10);
@@ -81,8 +94,8 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
   const maxTicks = Math.floor(config.maxSimulationSeconds / dt + 1e-10);
   for (let tick = 0; tick <= maxTicks; tick++) {
     completionTick = tick;
-    observer?.advance(seconds(tick));
-    policyObserver?.advance(seconds(tick));
+    const observedChange = observer?.advance(seconds(tick)) ?? false;
+    const policyObservedChange = policyObserver?.advance(seconds(tick)) ?? false;
     // Row cells are held until service finishes. Events at a boundary use
     // half-open occupancy intervals: release, movement, then admission.
     for (let cell = 1; cell <= aircraft.rows; cell++) {
@@ -143,7 +156,41 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
     if (tick >= nextAdmissionTick && !escortUnit) {
       if (!activeUnit) {
         let candidate;
-        if (observer) {
+        if (adaptive) {
+          const visibleCabin = { seatedSeats: [...seated],
+            aisle: aisle.filter(Boolean).map(state => ({ passengerId: state.passenger.id, cell: state.cell, targetRow: state.row,
+              ...(passengerAware ? { rowObservedAtSeconds: records.get(state.passenger.id)?.rowArrivalSeconds ?? null } : {}) })) };
+          const cabinSignature = passengerAware ? JSON.stringify(visibleCabin) : null;
+          const cabinChanged = passengerAware && pending.length > 0 && cabinSignature !== lastCabinSignature;
+          if (!lastRecommendation || lastRecommendation.action !== 'WAIT' || lastRecommendation.stage !== STAGE_NAMES[stage]
+              || observedChange || seconds(tick) >= lastRecommendation.nextReviewSeconds
+              || (lastRecommendation.reason === 'ASSISTANCE_REQUIRES_EMPTY_AISLE' && !occupied())
+              || (passengerAware && (policyObservedChange || cabinChanged))) {
+            // The allowlist below is the boundary between execution truth and
+            // optimization. No raw unit, passenger, future event or service-end
+            // timestamp crosses it.
+            lastRecommendation = adaptive.recommend(observer.snapshot(seconds(tick)), {
+              nowSeconds: seconds(tick), stage,
+              pendingUnits: pending.map(unit => ({ id: unit.id, memberIds: unit.members.map(p => p.id),
+                stage: unit.stage, zone: unit.zone, assisted: unit.assisted })),
+              cabin: visibleCabin,
+              ...(passengerAware ? { strategy, cabinOccupied: occupied(),
+                policySnapshot: policyObserver.snapshot(seconds(tick)),
+                boardedPassengerIds: [...records.keys()],
+                seatedPassengerIds: [...records.values()].filter(r => r.seatedAtSeconds !== undefined).map(r => r.passengerId),
+                assumptions: { tickSeconds: dt, gateHeadwaySeconds: config.gateHeadwaySeconds,
+                  seatInterferenceSecondsPerBlocker: config.seatInterferenceSecondsPerBlocker,
+                  mobilityAssistanceSeconds: config.mobilityAssistanceSeconds, extraTimeAssistanceSeconds: config.extraTimeAssistanceSeconds }
+              } : {})
+            });
+            if (passengerAware) lastRecommendation = { ...lastRecommendation, trigger: observedChange ? 'PASSENGER_OBSERVATION'
+              : policyObservedChange ? 'STAFF_OBSERVATION' : cabinChanged ? 'CABIN_PROGRESS' : 'STAGE_OR_REVIEW_TIMER' };
+            lastCabinSignature = cabinSignature;
+            recommendations.push(policyObserver ? { ...lastRecommendation, advisory: true, simulationOnly: true,
+              requiresStaffApproval: true, requiresGateVerification: true, executionAuthorization: 'NONE_ADVISORY_ONLY' } : lastRecommendation);
+          }
+          if (lastRecommendation.action === 'RELEASE') candidate = pending.find(unit => unit.id === lastRecommendation.unitId);
+        } else if (observer) {
           const units = pending.filter(unit => unit.stage === stage);
           const zone = strategy === 'zone' && stage === 2 ? Math.min(...units.map(unit => unit.zone)) : null;
           candidate = units.find(unit => (zone === null || unit.zone === zone)
@@ -256,6 +303,8 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
     result.events = events.sort((a, b) => a.timeSeconds - b.timeSeconds || a.sequence - b.sequence)
       .map((event, eventIndex) => ({ ...event, eventIndex }));
   }
+  if (adaptive) result.recommendations = recommendations;
+  if (passengerAware) result.adaptiveVersion = ADAPTIVE_VERSION;
   if (policyObserver) {
     result.policyProfileId = manifest.boardingPolicy.profileId;
     result.policyAdvisories = policyAdvisories;

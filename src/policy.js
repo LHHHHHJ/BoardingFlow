@@ -18,13 +18,26 @@ const idList = (list, ids, label) => {
 };
 
 export function validateBoardingPolicy(policy, passengers, { requireStaffEvents = true } = {}) {
-  knownKeys(policy, Object.keys(POLICY_DEFAULTS), 'policy');
+  knownKeys(policy, [...Object.keys(POLICY_DEFAULTS), 'confirmedAnimalArrangements'], 'policy');
   if (policy.profileId !== POLICY_ID || !['CONFIRMED', 'UNVERIFIED'].includes(policy.status)) fail('unknown profile or confirmation status');
   const ids = new Set(passengers.map(p => p.id));
   for (const key of ['confirmedFirstClassPassengerIds', 'elitePriorityPassengerIds', 'confirmedAssistancePassengerIds']) idList(policy[key], ids, key);
   const requested = new Set(passengers.filter(p => p.assistance.type !== 'NONE').map(p => p.id));
   if (policy.confirmedAssistancePassengerIds.some(id => !requested.has(id))
       || [...requested].some(id => !policy.confirmedAssistancePassengerIds.includes(id))) fail('assistance arrangements require explicit confirmation; staff review required');
+  if (policy.confirmedAnimalArrangements !== undefined) {
+    if (!Array.isArray(policy.confirmedAnimalArrangements)) fail('confirmed animal arrangements must be an array');
+    const seen = new Set();
+    for (const arrangement of policy.confirmedAnimalArrangements) {
+      knownKeys(arrangement, ['passengerId', 'kind', 'confirmed', 'boardingRequirement'], 'animal arrangement');
+      const passenger = passengers.find(p => p.id === arrangement.passengerId);
+      if (!passenger || seen.has(passenger.id) || !['PET', 'SERVICE_ANIMAL'].includes(arrangement.kind)
+          || arrangement.confirmed !== true || !['NONE', 'EXTRA_TIME', 'MOBILITY'].includes(arrangement.boardingRequirement)) fail('invalid/unconfirmed animal arrangement; staff review required');
+      if (arrangement.boardingRequirement !== 'NONE' && (passenger.assistance.type !== arrangement.boardingRequirement
+          || !policy.confirmedAssistancePassengerIds.includes(passenger.id))) fail('animal-related requirement must match separately confirmed assistance');
+      seen.add(passenger.id);
+    }
+  }
   if (!Array.isArray(policy.families)) fail('families must be an array');
   const familyIds = new Set();
   for (const family of policy.families) {
@@ -87,11 +100,14 @@ export function createPolicyObserver(policy, passengers) {
   function advance(now) {
     if (!Number.isFinite(now) || now < clock) throw new Error('Policy observation clock must be finite and monotonic');
     clock = now;
+    let changed = false;
     while (cursor < events.length && events[cursor].timeSeconds <= now) {
       const e = events[cursor++];
       states.get(e.passengerId)[e.kind === 'STAFF_APPROVAL' ? 'approval' : 'gateVerification'] = { confirmed: e.confirmed, atSeconds: e.timeSeconds };
       latestObservedAtSeconds = e.timeSeconds;
+      changed = true;
     }
+    return changed;
   }
   function confirmed(id) {
     const state = states.get(id);

@@ -1,0 +1,17 @@
+{
+  "expectedSeatSeconds": 4,
+  "expectedWalkSecondsPerRow": 1,
+  "expectedAssistedWalkSecondsPerRow": 2,
+  "completionWeight": 0.15,
+  "inducedBlockingWeight": 1,
+  "pathDelayWeight": 1,
+  "seatAccessWeight": 2,
+  "baggageOverlapWeight": 1,
+  "rowWeight": 0.2,
+  "waitingSecondsPerMinute": 0.1,
+  "waitingCreditCapSeconds": 5,
+  "staleObservationSeconds": 120,
+  "uncertaintyBaseSeconds": 30,
+  "uncertaintyAgeWeight": 0.25,
+  "overdueUncertaintySeconds": 60
+}

@@ -16,6 +16,19 @@ export const DEFAULT_PHASE2_SETTINGS = {
     latePartyProbability: 0.2,
     lateStopMinSeconds: 900,
     lateStopMaxSeconds: 1800
+  },
+  adaptive: {
+    reviewIntervalSeconds: 5,
+    lookaheadSeconds: 20,
+    maxAnticipationWaitSeconds: 8,
+    waitCostPerSecond: 1,
+    minimumScoreImprovement: 5,
+    expectedStowSecondsPerBag: 15,
+    seatDepthWeight: 12,
+    rowWeight: 0.4,
+    zoneWeight: 1.5,
+    congestionWeight: 0.4,
+    interferenceWeight: 8
   }
 };
 
@@ -38,6 +51,7 @@ export function phase2Settings(patch = {}) {
   for (const key of ['walkingSpeedMps', 'assistedWalkingSpeedMps', 'estimatedSecuritySeconds', 'minimumRemainingSecuritySeconds', 'overdueRecheckSeconds']) {
     if (result.eta[key] <= 0) throw new Error(`${key} must be positive`);
   }
+  if (result.adaptive.reviewIntervalSeconds <= 0) throw new Error('reviewIntervalSeconds must be positive');
   for (const [section, min, max] of [
     ['eta', 'stopDelayMinSeconds', 'stopDelayMaxSeconds'],
     ['scenarios', 'securityDelayMinSeconds', 'securityDelayMaxSeconds'],
