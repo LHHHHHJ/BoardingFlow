@@ -63,6 +63,23 @@ Use `--phase2-config config/stage4.example.json` with `generate --scenario ...` 
 
 See [the six-item Stage 4 audit and official-map reference boundary](docs/STAGE4_AUDIT.md) and [actual accuracy/test results](docs/STAGE4_RESULTS.md). The retained route lengths and accessibility flags are invented model assumptions, **not official Toronto Pearson measurements**. No map artwork is included.
 
+## Stage 5 passenger rights and constraints
+
+Use the explicit `BF-SWISS-INSPIRED-V1` teaching-policy profile to protect confirmed First/Business/elite entitlements, assistance, required families and under-five family preboarding. It collapses the reference airline's priority tiers into one protected stage and retains this model's general zones. Historical manifests without a profile retain the legacy research rules so existing benchmarks remain reproducible.
+
+```powershell
+node src/cli.js generate --scenario normal --seed 42 --output data/stage5-normal.json
+node src/cli.js apply-policy --input data/stage5-normal.json --policy-config config/stage5.example.json --output data/stage5-policy.json
+node src/cli.js policy-preview --input data/stage5-policy.json --at 0 --strategy zone --output results/stage5/advisory.json
+node src/cli.js simulate --input data/stage5-policy.json --strategy random --output results/stage5/random --trace
+node --test test/stage5.test.js
+node --test
+```
+
+The example is specific to the default seed-42 passenger IDs. Its staff confirmations are explicitly simulated at gate arrival and five seconds afterward; they are not real staff approvals. Omit synthetic confirmations to test pending manual approval, or supply explicit timestamped `staffEvents`. Unverified policy, missing clearance/arrival evidence, or missing approval never permits simulated boarding. `policy-preview` assumes no earlier aircraft admissions and remains advisory.
+
+No age, senior or pet label grants rights or changes walking speed. Family eligibility and assistance use explicit confirmed arrangements; no diagnosis data is requested. See [the seven-item Stage 5 audit, configuration contract and actual results](docs/STAGE5_AUDIT.md). The adaptive scoring module is unchanged; this stage adds shared rights checks and safety gates only.
+
 ## Run everything
 
 From the parent workspace in PowerShell:

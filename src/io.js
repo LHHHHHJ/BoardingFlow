@@ -103,6 +103,8 @@ export async function writeArtifacts(directory, manifest, results) {
     dataKind: 'SYNTHETIC',
     seed: manifest.seed,
     flightId: manifest.flight.flightId,
+    ...(manifest.boardingPolicy ? { policyProfileId: manifest.boardingPolicy.profileId,
+      policyNotice: 'SYNTHETIC advisory simulation; staff approval, observed clearance and gate verification are required for admission.' } : {}),
     inputHash: results[0]?.inputHash,
     metricNotes: {
       totalBoardingSeconds: 'Elapsed from boarding opening (t=0) until last seating; includes idle periods.',

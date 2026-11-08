@@ -1,0 +1,19 @@
+{
+  "profileId": "BF-SWISS-INSPIRED-V1",
+  "status": "CONFIRMED",
+  "confirmedFirstClassPassengerIds": ["SYN-P010"],
+  "elitePriorityPassengerIds": ["SYN-P040"],
+  "confirmedAssistancePassengerIds": ["SYN-P028", "SYN-P077", "SYN-P155"],
+  "families": [
+    {
+      "id": "SYN-FAMILY-EXAMPLE",
+      "memberIds": ["SYN-P001", "SYN-P002", "SYN-P175", "SYN-P176"],
+      "youngChildUnderFivePassengerIds": ["SYN-P001"],
+      "guardianPassengerIds": ["SYN-P002"]
+    }
+  ],
+  "syntheticStaffConfirmation": {
+    "approvalDelaySeconds": 0,
+    "gateVerificationDelaySeconds": 5
+  }
+}

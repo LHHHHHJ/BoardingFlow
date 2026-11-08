@@ -1,11 +1,12 @@
 import { individualStage, parseSeat, seatDepth } from './model.js';
 import { randomStream, shuffle } from './random.js';
+import { requiredPolicyGroups } from './policy.js';
 
 export const STRATEGIES = ['random', 'zone', 'baggage-aware'];
 
 export function boardingUnits(manifest) {
-  const groups = new Map();
-  for (const passenger of manifest.passengers) {
+  const groups = manifest.boardingPolicy ? requiredPolicyGroups(manifest.passengers, manifest.boardingPolicy) : new Map();
+  for (const passenger of manifest.boardingPolicy ? [] : manifest.passengers) {
     const key = passenger.travelPartyId === null ? `solo:${passenger.id}` : `party:${passenger.travelPartyId}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(passenger);
@@ -17,7 +18,7 @@ export function boardingUnits(manifest) {
     return {
       id,
       members,
-      stage: Math.min(...members.map(individualStage)),
+      stage: Math.min(...members.map(p => individualStage(p, manifest.boardingPolicy))),
       zone: Math.min(...members.map(p => p.boardingZone)),
       readySeconds: Math.max(...members.map(p => p.gateArrivalSeconds)),
       assisted: members.some(p => p.assistance.type !== 'NONE'),

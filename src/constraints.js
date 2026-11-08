@@ -8,6 +8,9 @@ export function constraintReport(manifest, result) {
     duplicatePassenger: 0, duplicateSeat: 0, wrongSeat: 0, missingPassenger: 0,
     priorityStageOrder: 0, preboardingBarrier: 0, splitTravelParty: 0, assistanceConflict: 0
   };
+  if (manifest.boardingPolicy) Object.assign(counts, {
+    observedReadinessViolation: 0, staffApprovalViolation: 0, gateVerificationViolation: 0, familySeparation: 0
+  });
   const passengers = new Map(manifest.passengers.map(p => [p.id, p]));
   const units = boardingUnits(manifest);
   const unitByPassenger = new Map(units.flatMap(unit => unit.members.map(p => [p.id, unit])));
@@ -26,6 +29,15 @@ export function constraintReport(manifest, result) {
     if (record.boardedAtSeconds < Math.max(0, passenger.gateArrivalSeconds)) counts.earlyGateEntry++;
     if (record.boardedAtSeconds < passenger.checkInAtSeconds) counts.earlyCheckInEntry++;
     if (record.boardedAtSeconds < passenger.securityClearedAtSeconds) counts.earlySecurityEntry++;
+    if (manifest.boardingPolicy) {
+      const observed = manifest.phase2.observations.filter(e => e.passengerId === passenger.id && e.timeSeconds <= record.boardedAtSeconds);
+      if ([['CHECK_IN_CLEARED', 'CHECK_IN'], ['SECURITY_CLEARED', 'SECURITY_EXIT'], ['GATE_ARRIVED', manifest.phase2.assignedGateId]]
+        .some(([type, checkpoint]) => !observed.some(e => e.type === type && e.checkpointId === checkpoint))) counts.observedReadinessViolation++;
+      const confirmations = manifest.boardingPolicy.staffEvents.filter(e => e.passengerId === passenger.id && e.confirmed === true && e.timeSeconds <= record.boardedAtSeconds);
+      if (!confirmations.some(e => e.kind === 'STAFF_APPROVAL')) counts.staffApprovalViolation++;
+      const gateAt = observed.find(e => e.type === 'GATE_ARRIVED')?.timeSeconds;
+      if (!confirmations.some(e => e.kind === 'GATE_VERIFICATION' && e.timeSeconds >= gateAt)) counts.gateVerificationViolation++;
+    }
     const stage = unitByPassenger.get(passenger.id).stage;
     if (stage < previousStage || record.stage !== STAGE_NAMES[stage]) counts.priorityStageOrder++;
     previousStage = Math.max(previousStage, stage);
@@ -42,6 +54,10 @@ export function constraintReport(manifest, result) {
       const end = Math.max(...members.map(r => r.seatedAtSeconds));
       counts.assistanceConflict += timings.filter(r => r.unitId !== unit.id && r.boardedAtSeconds < end && r.seatedAtSeconds > start).length;
     }
+  }
+  if (manifest.boardingPolicy) for (const family of manifest.boardingPolicy.families) {
+    const members = timings.filter(r => family.memberIds.includes(r.passengerId));
+    if (members.length !== family.memberIds.length || new Set(members.map(r => r.unitId)).size !== 1) counts.familySeparation++;
   }
   return { total: Object.values(counts).reduce((a, b) => a + b, 0), counts };
 }

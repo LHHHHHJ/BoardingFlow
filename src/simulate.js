@@ -2,6 +2,7 @@ import { blockingSeats, manifestHash, parseSeat, STAGE_NAMES, validateManifest }
 import { boardingUnits, orderUnits, readyUnit } from './strategies.js';
 import { validateScenario } from './scenarios.js';
 import { createReadinessObserver } from './readiness.js';
+import { createPolicyObserver, reviewBoardingRecommendation } from './policy.js';
 import { constraintReport } from './constraints.js';
 import { createTraceMetadata, validateSimulationTrace } from './trace.js';
 
@@ -11,8 +12,11 @@ const sum = (items, key) => clean(items.reduce((total, item) => total + item[key
 export function simulate(manifest, strategy, { trace = false, requireFullFlight = true } = {}) {
   validateManifest(manifest, { requireFullFlight });
   if (manifest.phase2) validateScenario(manifest, { requireFullFlight });
+  if (manifest.boardingPolicy?.status === 'UNVERIFIED') throw new Error('Policy unverified: staff review required before simulated boarding');
   const pending = orderUnits(manifest, strategy);
   const observer = manifest.phase2 ? createReadinessObserver(manifest) : null;
+  const policyObserver = manifest.boardingPolicy ? createPolicyObserver(manifest.boardingPolicy, manifest.passengers) : null;
+  const policyAdvisories = [];
   const { simulation: config, aircraft } = manifest.config;
   const dt = config.tickSeconds;
   const ticks = seconds => Math.ceil(seconds / dt - 1e-10);
@@ -78,6 +82,7 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
   for (let tick = 0; tick <= maxTicks; tick++) {
     completionTick = tick;
     observer?.advance(seconds(tick));
+    policyObserver?.advance(seconds(tick));
     // Row cells are held until service finishes. Events at a boundary use
     // half-open occupancy intervals: release, movement, then admission.
     for (let cell = 1; cell <= aircraft.rows; cell++) {
@@ -142,9 +147,24 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
           const units = pending.filter(unit => unit.stage === stage);
           const zone = strategy === 'zone' && stage === 2 ? Math.min(...units.map(unit => unit.zone)) : null;
           candidate = units.find(unit => (zone === null || unit.zone === zone)
-            && unit.members.every(p => observer.isReadyAtGate(p.id)));
+            && unit.members.every(p => observer.isReadyAtGate(p.id) && (!policyObserver || policyObserver.confirmed(p.id))));
         } else {
           candidate = readyUnit(pending, stage, seconds(tick), strategy);
+        }
+        if (policyObserver && candidate) {
+          const snapshot = observer.snapshot(seconds(tick));
+          const policySnapshot = policyObserver.snapshot(seconds(tick));
+          const context = { nowSeconds: seconds(tick), stage, strategy, cabinOccupied: occupied(),
+            boardedPassengerIds: [...records.keys()],
+            seatedPassengerIds: [...records.values()].filter(r => r.seatedAtSeconds !== undefined).map(r => r.passengerId),
+            pendingUnits: pending.map(u => ({ id: u.id, memberIds: u.members.map(p => p.id), stage: u.stage, zone: u.zone, assisted: u.assisted })) };
+          let review = reviewBoardingRecommendation(snapshot, context, policySnapshot, { unitId: candidate.id, memberIds: candidate.members.map(p => p.id) });
+          if (!review.simulationAdmissionAllowed && review.reason === 'STAFF_APPROVAL_OR_GATE_VERIFICATION_PENDING') {
+            const fallback = reviewBoardingRecommendation(snapshot, context, policySnapshot);
+            if (fallback.simulationAdmissionAllowed) review = fallback;
+          }
+          policyAdvisories.push(review);
+          candidate = review.simulationAdmissionAllowed ? pending.find(u => u.id === review.unitId) : null;
         }
         // An assisted party reserves the otherwise empty aisle and escort.
         if (candidate && (!candidate.assisted || !occupied())) {
@@ -170,7 +190,8 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
             gateBlockedSinceTick = null;
           }
           const passenger = activeUnit.members[memberIndex++];
-          if (seconds(tick) < passenger.gateArrivalSeconds || (observer && !observer.isReadyAtGate(passenger.id))) {
+          if (seconds(tick) < passenger.gateArrivalSeconds || (observer && !observer.isReadyAtGate(passenger.id))
+              || (policyObserver && !policyObserver.confirmed(passenger.id))) {
             throw new Error('Execution guard: passenger is not actually cleared and present at gate');
           }
           const { row } = parseSeat(passenger.seatNumber);
@@ -234,6 +255,10 @@ export function simulate(manifest, strategy, { trace = false, requireFullFlight 
     result.traceMetadata = createTraceMetadata(manifest);
     result.events = events.sort((a, b) => a.timeSeconds - b.timeSeconds || a.sequence - b.sequence)
       .map((event, eventIndex) => ({ ...event, eventIndex }));
+  }
+  if (policyObserver) {
+    result.policyProfileId = manifest.boardingPolicy.profileId;
+    result.policyAdvisories = policyAdvisories;
   }
   result.constraintViolations = constraintReport(manifest, result);
   result.metrics.constraintViolationCount = result.constraintViolations.total;

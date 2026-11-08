@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { makeConfig, TRAVEL_CLASSES } from './config.js';
 import { auditCarryOn } from './baggage.js';
+import { policyIndividualStage, validateBoardingPolicy, requiredPolicyGroups } from './policy.js';
 
 export const ASSISTANCE_TYPES = ['NONE', 'MOBILITY', 'EXTRA_TIME'];
 export const STAGE_NAMES = ['PREBOARD', 'PRIORITY', 'GENERAL'];
@@ -21,7 +22,10 @@ export function blockingSeats(seatNumber) {
     .map(other => `${row}${other}`);
 }
 
-export function individualStage(passenger) {
+export function individualStage(passenger, policy = null) {
+  // Preserve the original Array.map(individualStage) API: its second argument
+  // is a numeric index, not a policy profile.
+  if (policy && typeof policy !== 'number') return policyIndividualStage(passenger, policy);
   if (passenger.mandatoryPreboarding || passenger.assistance.type !== 'NONE') return 0;
   return passenger.priorityEligible ? 1 : 2;
 }
@@ -112,13 +116,20 @@ export function validateManifest(manifest, { requireFullFlight = true, allowNonc
     for (const key of ['walkSecondsPerRow', 'seatSeconds', 'stowSecondsPerBag']) finite(passenger.behavior[key], key, 0);
     if (passenger.behavior.walkSecondsPerRow <= 0 || passenger.behavior.seatSeconds <= 0) fail('walking and seating durations must be positive');
   }
+  if (Object.hasOwn(manifest, 'boardingPolicy')) {
+    if (!manifest.boardingPolicy || !manifest.phase2) fail('Stage 5 boarding policy requires a valid profile and observed readiness');
+    validateBoardingPolicy(manifest.boardingPolicy, passengers);
+  }
+  const policyGroupById = new Map(manifest.boardingPolicy
+    ? [...requiredPolicyGroups(passengers, manifest.boardingPolicy)].flatMap(([id, members]) => members.map(p => [p.id, id])) : []);
   const byId = new Map(passengers.map(passenger => [passenger.id, passenger]));
   for (const passenger of passengers) {
     const companionId = passenger.assistance.companionId;
     if (companionId !== null) {
       const companion = byId.get(companionId);
-      if (!companion || companionId === passenger.id || !passenger.travelPartyId
-          || companion.travelPartyId !== passenger.travelPartyId) fail('assistance companion must be another passenger in the same party');
+      const sameParty = !!passenger.travelPartyId && companion?.travelPartyId === passenger.travelPartyId;
+      const sameConfirmedFamily = manifest.boardingPolicy && policyGroupById.get(companionId) === policyGroupById.get(passenger.id);
+      if (!companion || companionId === passenger.id || (!sameParty && !sameConfirmedFamily)) fail('assistance companion must be another passenger in the same required party/family');
     }
   }
   return { passengerCount: passengers.length, uniqueSeats: seats.size, capacity, inputHash: manifestHash(manifest) };
